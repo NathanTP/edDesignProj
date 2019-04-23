@@ -338,8 +338,8 @@ simply “frame”.
 
                                                                   
 <!--l. 19--><p class="noindent" > <img 
-src="figs/generic_paging-.png" alt="PIC" 
- />
+src="figs/generic_paging-.png" alt="PIC""
+/>
 <br /> </p><div class="caption" 
 ><span class="id">Figure 1: </span><span  
 class="content">Flow chart for virtual to physical address look up in a typical virtual
@@ -495,27 +495,21 @@ href="#x1-120115">5<!--tex4ht:ref: fig:evict_detail --></a>):
      </li>
      <li 
   class="enumerate" id="x1-12010x5">The OS stores a page identifier in the PTE and marks it as remote once
-     the PFA eviction is complete.</li></ol>
-   <hr class="figure" /><div class="figure" 
->
-                                                                  
+     the PFA eviction is complete.</li>
+</ol>
 
+<hr class="figure" /><div class="figure"  style="width: 50%; height: 50%;">
+    <a id="x1-120115"></a>
                                                                   
-<a 
- id="x1-120115"></a>
-                                                                  
+  <!--l. 24--><p class="noindent" > <img 
+  src="figs/pfa_evict_detail-.png" alt="PIC"
+   />
+  <br /> </p><div class="caption" 
+  ><span class="id">Figure 5: </span><span  
+  class="content">Detailed eviction flow</span></div><!--tex4ht:label?: x1-120115 -->
+                                                                   
+</div><hr class="endfigure" />
 
-                                                                  
-<!--l. 24--><p class="noindent" > <img 
-src="figs/pfa_evict_detail-.png" alt="PIC"  
- />
-<br /> </p><div class="caption" 
-><span class="id">Figure 5: </span><span  
-class="content">Detailed eviction flow</span></div><!--tex4ht:label?: x1-120115 -->
-                                                                  
-
-                                                                  
-   </div><hr class="endfigure" />
 <!--l. 29--><p class="indent" >   In addition to the three main queues, there are a number of other maintenance
 registers that are used for querying queue status and initializing the PFA. I will
 mention one status register here; the EVICT_STAT register. When a page is placed
@@ -554,26 +548,17 @@ href="#x1-130136">6<!--tex4ht:ref: fig:fetch_detail --></a>):
      </li>
      <li 
   class="enumerate" id="x1-13012x6">The application is restarted.</li></ol>
-   <hr class="figure" /><div class="figure" 
->
-                                                                  
 
-                                                                  
-<a 
- id="x1-130136"></a>
-                                                                  
+<hr class="figure" /><div class="figure"   style="width: 50%; height: 50%;">
+  <a id="x1-130136"></a>
+  <!--l. 56--><p class="noindent" > <img 
+    src="figs/pfa_fetch_detail-.png" alt="PIC"  
+  />
+  <br /> </p><div class="caption">
+      <span class="id">Figure 6: </span><span  
+        class="content">Detailed fetch flow</span></div><!--tex4ht:label?: x1-130136 -->
+</div><hr class="endfigure" />
 
-                                                                  
-<!--l. 56--><p class="noindent" > <img 
-src="figs/pfa_fetch_detail-.png" alt="PIC"  
- />
-<br /> </p><div class="caption" 
-><span class="id">Figure 6: </span><span  
-class="content">Detailed fetch flow</span></div><!--tex4ht:label?: x1-130136 -->
-                                                                  
-
-                                                                  
-   </div><hr class="endfigure" />
 <!--l. 62--><p class="noindent" ><span class="paragraphHead"><a 
  id="x1-140003.1"></a><span 
 class="cmbx-10">Metadata Management</span></span>
@@ -745,33 +730,25 @@ software development was done using the functional simulator.
 paging behavior. Figure <a 
 href="#x1-210018">8<!--tex4ht:ref: fig:linux_changes --></a> summarizes these changes.
 </p>
-   <hr class="figure" /><div class="figure" 
->
-                                                                  
 
-                                                                  
-<a 
- id="x1-210018"></a>
-                                                                  
+<hr class="figure" /><div class="figure" >
+  <a id="x1-210018"></a>
+  <!--l. 100--><p class="noindent" >
+  <img 
+    src="./figs/linux_changes-.png" alt="PIC" style="width: 50%; height: 50%;"
+  />
+  <br /> </p><div class="caption" 
+  ><span class="id">Figure 8: </span><span  
+  class="content">Major changes to Linux paging to accommodate the PFA. Most
+  subsystems could be re-used without change. On the eviction path, all that
+  was  changed  was  the  PTE  update  (to  write  a  remote  <span id="textcolor36">PTE</span>  instead  of  a
+  <span id="textcolor37">swap_entry_t</span>), and the write to disk (to write to remote memory instead). The
+  bookkeeping path is now triggered either from the page-fault handler (due to
+  a PFA service request) or from <span id="textcolor38">kpfad</span>. The core bookkeeping function remains
+  unmodified.</span></div><!--tex4ht:label?: x1-210018 -->
+</div><hr class="endfigure" />
 
-                                                                  
-<!--l. 100--><p class="noindent" > <img 
-src="./figs/linux_changes-.png" alt="PIC"  
- />
-<br /> </p><div class="caption" 
-><span class="id">Figure 8: </span><span  
-class="content">Major changes to Linux paging to accommodate the PFA. Most
-subsystems could be re-used without change. On the eviction path, all that
-was  changed  was  the  PTE  update  (to  write  a  remote  <span id="textcolor36">PTE</span>  instead  of  a
-<span id="textcolor37">swap_entry_t</span>), and the write to disk (to write to remote memory instead). The
-bookkeeping path is now triggered either from the page-fault handler (due to
-a PFA service request) or from <span id="textcolor38">kpfad</span>. The core bookkeeping function remains
-unmodified.</span></div><!--tex4ht:label?: x1-210018 -->
-                                                                  
-
-                                                                  
-   </div><hr class="endfigure" />
-   <h5 class="subsubsectionHead"><span class="titlemark">4.2.2   </span> <a 
+<h5 class="subsubsectionHead"><span class="titlemark">4.2.2   </span> <a 
  id="x1-220004.2.2"></a>kpfad</h5>
 <!--l. 185--><p class="noindent" >The most basic implementation of PFA support in Linux simply performs
 bookkeeping tasks whenever the internal queues of the PFA fill up. This effectively
