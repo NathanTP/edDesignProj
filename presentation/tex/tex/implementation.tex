@@ -1,0 +1,72 @@
+The PFA was implemented within the RISC-V ecosystem. RISC-V is an open-source
+instruction set with several open and closed-source implementations and ports
+for many common software components\cite{riscv}.
+
+% \subsection{PFA Reference Implementation}
+% To accelerate software development, and to provide a golden-model of
+% PFA behavior, we implemented the PFA first in a RISC-V ISA simulator called
+% "Spike"\cite{spike}. Spike provides a functional simulation of a RISC-V core
+% through a straightforward C++ interpreter, but does not provide any timing
+% accuracy. Due to its simplicity, the PFA implementation required only a few
+% weeks of implementation effort and less than 1000 LoC. With Spike, software
+% development was able to proceed concurrently with the concrete hardware design.
+% Furthermore, unit tests developed under Spike were used to validate the
+% hardware implementation, reducing debugging effort. In all, the only software
+% change that was needed to go from Spike to a concrete implementation was one
+% extra TLB flush due to a difference in TLB design between Spike and the RISC-V
+% implementation we used.
+%
+\subsection{Hardware Implementation}
+The PFA prototype was implemented in the Chisel hardware construction
+language\cite{chisel} and integrated with a simple in-order CPU called
+RocketCore\cite{rocketchip}. The components were integrated using the
+RocketChip system-on-chip (SoC) generator\cite{rocketchip}. We provide an
+overview of the relevant systems in the following sections. The current PFA
+prototype implements a subset of the specification described in Section
+\ref{sec:pfaDesign}. Specifically, it does not support multiple simultaneous
+evictions (the EvictQ has an effective depth of 1), however, it does allow for
+asynchronous eviction. This prevents optimizations such as switching to other
+threads while many pages are simultaneously evicted (a single eviction does not
+take long enough to justify a context switch). 
+
+\subsubsection{RocketCore and RocketChip}
+RocketChip\cite{rocketchip} is a framework for generating SoCs. It includes
+on-chip interconnects, caches, and other utilities for chip construction. While
+the CPU is pluggable, we use only a single RocketCore in-order CPU for our
+experiments. Our implementation used dedicated 16KB instruction and data
+caches \todo{Details of rocket target}. While the node had access to several gigabytes of main memory, we
+artificially limited application memory using Linux cgroups (see Section
+\ref{sec:eval} for details). A real \gls{wsc} would likely include a mixture of
+simple cores, high single-thread performance cores, and
+accelerators. We hope to evaluate the Berkeley out-of-order core
+(BOOM\cite{BOOM}) and the Hwatcha vector accelerator\cite{hwatcha} in the
+future when they become available in our simulation infrastructure.
+
+\subsubsection{FireSim}
+We simulated the RTL using a cycle-accurate simulator called
+"FireSim"\cite{firesim}. FireSim is an FPGA-accelerated simulator that runs on
+the Amazon cloud. It can simulate thousands of nodes with a cycle-accurate
+network and heterogeneous components. Many parameters of the simulation are
+tunable within FireSim. We decided on a \SI{200}{\giga\bit\per\second} network
+with \SI{500}{\nano\second} link latency, leading to roughly 2us page access
+time to the memory blade (similar to current infiniband networks).
+
+\begin{figure}[h]
+\centering
+\begin{tabular}{| l | l |}
+  \hline
+  \textbf{CPU Type} & Rocket (5-stage in order) \\ \hline
+  \textbf{CPU Frequency} & \SI{3.2}{\giga\hertz} \\ \hline
+  \textbf{Caches} & \SI{16}{\kilo\byte} D\$ and I\$ \\ \hline
+  \textbf{NW Topology} & Single Switch \\ \hline
+  \textbf{NW Bandwidth} & \SI{200}{\giga\bit\per\second} \\ \hline
+  \textbf{NW Link Latency} & \SI{2}{\micro\second} \\ \hline
+  \textbf{Remote Page Read} & \SI{4.8}{\micro\second} \\ \hline
+  \textbf{Remote Page Write} & \SI{4.8}{\micro\second} \\ \hline
+\end{tabular}
+\caption{System parameters used for evaluation.}
+\label{tbl:sim_parameters}
+\end{figure}
+
+\subsection{Linux Integration} \label{sec:linuxImpl}
+    \input{tex/linuxDesign.tex}

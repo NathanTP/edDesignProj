@@ -1,0 +1,57 @@
+% \documentclass[pageno,hyperref]{jpaper}
+\documentclass{article}
+
+\input{tex/packages}
+\input{tex/environ}
+\input{tex/glossary}
+
+\begin{document}
+
+\title{
+PFA: Improving Swap Performance with the Page-Fault Accelerator}
+
+\author{Nathan Pemberton (nathanp@berkeley.edu), UC Berkeley}
+
+\date{}
+\maketitle
+
+\thispagestyle{empty}
+
+\input{tex/abstract}
+
+\section{Introduction} \label{sec:intro}
+    \input{tex/intro.tex}
+
+\section{Motivation and Background}
+    % \subsection{FireBox} \label{sec:firebox}
+    %     \input{tex/FireBox.tex}
+    \subsection{Interfaces to Remote Memory} \label{sec:rmemApproaches}
+        \input{tex/rmemApproaches.tex}
+    \subsection{OS Paging Background} \label{sec:pagingBackground}
+        \input{tex/pagingBackground.tex}
+
+\section{Page Fault Accelerator} \label{sec:pfa}
+    \input{tex/pfaOverview.tex}
+    \subsection{Page Fault Accelerator Design} \label{sec:pfaDesign}
+        \input{tex/pfaDesign.tex}
+
+\section{Implementation} \label{sec:impl}
+    \input{tex/implementation.tex}
+
+\section{Evaluation} \label{sec:eval}
+    \input{tex/results.tex}
+
+\section{Future Work} \label{sec:future}
+    \input{tex/future.tex}
+
+\section{Conclusion} \label{sec:conclusion}
+    \input{tex/conclusion.tex}
+
+% \listoftodos
+
+\nocite{*}
+\newpage
+\bibliographystyle{plain}
+\bibliography{pfa}
+
+\end{document}

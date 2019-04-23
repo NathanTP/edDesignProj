@@ -1,0 +1,16 @@
+Disaggregated memory systems promise to simplify deployment, allocation, and
+scheduling on next-generation \glspl{wsc}, but bring significant performance
+and complexity challenges. This complexity cannot be mitigated with shallow
+application changes because assumptions about system performance run deep.
+While caching attempts to avoid these challenges, we find that virtual memory
+paging is no different; the OS mechanisms implementing paging were designed in
+a world with millisecond-level access latencies and are not suitable for the
+microsecond access times offered by remote memory. The PFA allows us to make
+the deep changes needed to accommodate this new environment. By improving
+end-to-end application performance by up to 40\%, the PFA enables a greater
+range of applications to run on limited local memory. However, caching is a
+general purpose approach, and applications with large working sets and poor
+locality will always suffer from increased main memory access times. To take
+full advantage of disaggregated memory, we will need a mix of interfaces, both
+implicit, and explicit.
+

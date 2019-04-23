@@ -1,0 +1,1474 @@
+<!DOCTYPE html> 
+<html lang="en-US" xml:lang="en-US" > 
+<head><title> PFA: Improving Swap Performance with the Page-Fault Accelerator</title> 
+<meta  charset="utf-8" /> 
+<meta name="generator" content="TeX4ht (http://www.tug.org/tex4ht/)" /> 
+<meta name="viewport" content="width=device-width,initial-scale=1" /> 
+<link rel="stylesheet" type="text/css" href="pfa-asplos.css" /> 
+<meta name="src" content="pfa-asplos.tex" /> 
+</head><body 
+>
+   <div class="maketitle">
+                                                                  
+
+                                                                  
+                                                                  
+
+                                                                  
+
+<h2 class="titleHead"> PFA: Improving Swap Performance with the
+Page-Fault Accelerator</h2>
+ <div class="author" ><span 
+class="cmr-12">Nathan Pemberton (nathanp@berkeley.edu), UC Berkeley</span></div><br />
+<div class="date" ></div>
+   </div>
+   <div 
+class="abstract" 
+>
+<div class="center" 
+>
+<!--l. 1--><p class="noindent" >
+</p><!--l. 1--><p class="noindent" ><span 
+class="cmbx-9">Abstract</span></p></div>
+     <!--l. 3--><p class="indent" >    <span 
+class="cmr-9">Researchers from industry and academia have recently proposed to</span>
+     <span 
+class="cmr-9">disaggregate  memory  in  warehouse-scale  computers,  motivated  by  the</span>
+     <span 
+class="cmr-9">increasing performance of networks, and a proliferation of novel memory</span>
+     <span 
+class="cmr-9">technologies. In a system with memory disaggregation, each compute node</span>
+     <span 
+class="cmr-9">contains a modest amount of fast memory (e.g. high-bandwidth DRAM</span>
+     <span 
+class="cmr-9">integrated  on-package),  while  large  capacity  memory  or  non-volatile</span>
+     <span 
+class="cmr-9">memory is made available across the network through dedicated memory</span>
+     <span 
+class="cmr-9">nodes.  One  common  proposal  to  harness  the  fast  local  memory  is  to</span>
+     <span 
+class="cmr-9">use it as a large cache for the remote bulk memory. This cache could</span>
+     <span 
+class="cmr-9">be implemented purely in hardware, which could minimize latency, but</span>
+     <span 
+class="cmr-9">may involve complicated architectural changes and would lack OS insights</span>
+     <span 
+class="cmr-9">into  memory  usage.  An  alternative  is  to  manage  the  cache  purely  in</span>
+     <span 
+class="cmr-9">software with traditional paging mechanisms. This approach requires no</span>
+     <span 
+class="cmr-9">additional hardware, can use sophisticated algorithms, and has insight into</span>
+     <span 
+class="cmr-9">memory usage patterns. However, our experiments show that even when</span>
+     <span 
+class="cmr-9">paging to local memory, applications can be slowed significantly due to</span>
+     <span 
+class="cmr-9">the overhead of handling page faults, which can take several microseconds</span>
+     <span 
+class="cmr-9">and pollute the caches. In this paper, we present an extension to the</span>
+     <span 
+class="cmr-9">memory management unit that partially automates page faults, removing</span>
+     <span 
+class="cmr-9">the OS from the latency-critical page-in pathway. With this accelerator,</span>
+     <span 
+class="cmr-9">applications  on  a  disaggregated  system  spend  up  to  2.5x  less  time</span>
+     <span 
+class="cmr-9">managing paging, and run up to 40% faster end-to-end.</span>
+                                                                  
+
+                                                                  
+</p>
+</div>
+   <h3 class="sectionHead"><span class="titlemark">1   </span> <a 
+ id="x1-10001"></a>Introduction</h3>
+<!--l. 1--><p class="noindent" >Traditional data center design aggregates all necessary resources (e.g., disk,
+memory, power supply, etc.) into many self contained server chassis. This
+design was motivated by the ability to leverage commodity PC components
+and networks<span class="cite">[<span 
+class="cmbx-10">?</span>]</span>. Additionally, an aggregated design was desirable because
+in-chassis interconnects were significantly faster than networks. However, data
+center-side compute has grown into an important independent market, leading to
+specialized server platforms and networks (often called <span id="textcolor1">warehouse-scale computers
+(WSCs)</span>). Furthermore, networking technology has seen a rapid increase in
+performance, with 40 Gbit/s Ethernet becoming commonplace, and 100+
+Gbit/s networks readily available, narrowing the gap between off-package
+DRAM and remote memory. Workloads have also changed; applications are
+fundamentally distributed (e.g., service-oriented architecture, map-reduce,
+etc.), use larger and rapidly changing datasets (“Big Data”), and demand
+latencies that can only be delivered by in-memory processing. Finally, a
+number of promising new memory technologies are becoming available. New
+<span id="textcolor2">non-volatile memory (NVM)</span> devices are being introduced that promise low
+idle power, high density, and near-DRAM performance (e.g., fast NAND,
+phase-change, memristor). On the high-performance side, improvements
+in packaging technology have led to fast on-package DRAM (e.g., HBM)
+that offers hundreds of GB/s of bandwidth with capacities in the tens of
+GB.
+</p><!--l. 22--><p class="indent" >   These hardware and software trends have lead to proposals from both
+academia<span class="cite">[<span 
+class="cmbx-10">?</span>]</span><span class="cite">[<span 
+class="cmbx-10">?</span>]</span> and industry<span class="cite">[<span 
+class="cmbx-10">?</span>]</span><span class="cite">[<span 
+class="cmbx-10">?</span>]</span><span class="cite">[<span 
+class="cmbx-10">?</span>]</span><span class="cite">[<span 
+class="cmbx-10">?</span>]</span> for a new style of <span id="textcolor3">WSC</span> where resources are
+disaggregated . In a disaggregated <span id="textcolor4">WSC</span>, resources like disk and memory become
+first-class citizens over a high-performance network. A compute node couples CPUs,
+network interfaces, and a small amount of high-speed memory into a self-contained
+<span id="textcolor5">system in package (SiP)</span>. This design allows data center operators to scale memory
+capacity, while allocating it more flexibly (avoiding stranded resources and complex
+resource allocation policies). However, the memory access latency will be
+higher than traditional off-package DRAM, and bandwidth may be limited or
+subjected to congestion. The small on-package memory allows us to mitigate
+some of this performance gap, but the question remains: how best to use
+it?
+</p><!--l. 36--><p class="indent" >   One way to harness the on-package DRAM is to use it as a large cache for remote
+bulk memory. Operating systems have traditionally provided this through
+virtual memory <span id="textcolor6">paging</span> which uses virtual memory to treat local physical
+memory as a software-managed cache (typically for disk). Indeed, several
+recent academic research projects have proposed using paging over <span id="textcolor7">remote
+direct memory access (RDMA)</span> as a way of disaggregating memory<span class="cite">[<span 
+class="cmbx-10">?</span>]</span><span class="cite">[<span 
+class="cmbx-10">?</span>]</span>.
+Paging has traditionally been backed by slow disks with access latencies in the
+                                                                  
+
+                                                                  
+milliseconds. This lead to sophisticated algorithms that can take several
+microseconds for every cache miss. An alternative is to have fully hardware
+managed DRAM caches<span class="cite">[<span 
+class="cmbx-10">?</span>]</span><span class="cite">[<span 
+class="cmbx-10">?</span>]</span>. These eliminate much of the overhead, but lack
+the sophistication and application-level insight of OS-based approaches.
+For example, operating systems often use significant memory for optimistic
+pre-fetching and caching of disk blocks. A hardware-managed cache may
+choose to store these in remote memory, while the OS would simply delete
+them.
+</p><!--l. 52--><p class="indent" >   This paper introduces a hardware accelerator for OS-managed caching called the
+<span id="textcolor8">page fault accelerator (PFA)</span>. The <span id="textcolor9">PFA</span> works by handling latency-critical page faults
+(cache-miss) in hardware, while allowing the OS to manage latency-insensitive
+(but algorithmically complex) evictions asynchronously. We achieve this
+decoupling with a queue of free page frames (freeQ) to be used by the <span id="textcolor10">PFA</span>
+for fetched pages, and a queue of new page descriptors (newQ) that the
+OS can use to manage new page meta-data. Execution then proceeds as
+follows:
+</p>
+     <ul class="itemize1">
+     <li class="itemize">The OS allocates several page frames and pushes their addresses onto the
+     <span 
+class="cmti-10">freeQ</span>.
+     </li>
+     <li class="itemize">The OS experiences memory pressure and selects pages to evict to remote
+     memory. It marks them as “remote” in the page tables and then provides
+     them to the <span id="textcolor11">PFA</span> for eviction.
+     </li>
+     <li class="itemize">The application attempts to access a remote page, triggering the <span id="textcolor12">PFA</span> to
+     request the page from remote memory and place it in the next available
+     free frame. The application is then resumed.
+     </li>
+     <li class="itemize">Some time later (either through a background daemon, or through an
+     interrupt due to full queues) the OS pops all new page descriptors off the
+     <span 
+class="cmti-10">newQ </span>and records the (now local) pages in its meta-data. The OS typically
+     provides more free frames at this time.</li></ul>
+<!--l. 25--><p class="noindent" >
+</p>
+   <h3 class="sectionHead"><span class="titlemark">2   </span> <a 
+ id="x1-20002"></a>Motivation and Background</h3>
+                                                                  
+
+                                                                  
+<!--l. 28--><p class="noindent" >
+</p>
+   <h4 class="subsectionHead"><span class="titlemark">2.1   </span> <a 
+ id="x1-30002.1"></a>Interfaces to Remote Memory</h4>
+<!--l. 1--><p class="noindent" >The problem of deep and heterogeneous memory hierarchies is not entirely new;
+previous mainframe and high-performance computing platforms have previously
+exposed the concept of remote memory. I will describe some of these approaches in
+the next two sections.
+</p><!--l. 6--><p class="noindent" >
+</p>
+   <h5 class="subsubsectionHead"><span class="titlemark">2.1.1   </span> <a 
+ id="x1-40002.1.1"></a>Low-Level Interfaces</h5>
+<!--l. 7--><p class="noindent" ><span class="paragraphHead"><a 
+ id="x1-50002.1.1"></a><span 
+class="cmbx-10">NUMA</span></span>
+   <span id="textcolor13">Non-uniform memory access (NUMA)</span> architectures partition memory resources
+across several compute nodes such that memory is always local to exactly one
+compute resource, but still directly addressable by the others. In this case, all
+memory has the same interface (loads and stores from CPUs), but some is faster than
+others (non-uniform). Some <span id="textcolor14">NUMA</span> systems include hardware services to aid in page
+migration to mitigate this effect<span class="cite">[<span 
+class="cmbx-10">?</span>]</span>.
+</p><!--l. 15--><p class="indent" >   <span id="textcolor15">NUMA</span> systems are appealing because they appear to software as a single, large
+memory. They can also offer memory access latencies on the order of 100s of
+nanoseconds. This performance and tight coupling, however, limit scalability. The
+largest NUMA systems can scale to hundreds of nodes and 10s of TB of memory<span class="cite">[<span 
+class="cmbx-10">?</span>]</span>,
+but typical systems support only a few TB and less than 10 nodes (due to poor
+scaling in cost and power).
+</p>
+<!--l. 22--><p class="noindent" ><span class="paragraphHead"><a 
+ id="x1-60002.1.1"></a><span 
+class="cmbx-10">RDMA</span></span>
+   <span id="textcolor16">RDMA</span> systems are similar to NUMA in that memory resources are partitioned
+among several compute nodes (memory is always local to someone)<span class="cite">[<span 
+class="cmbx-10">?</span>]</span><span class="cite">[<span 
+class="cmbx-10">?</span>]</span>. The
+difference is that while NUMA systems typically expose a cache-coherent load-store
+interface to both local and remote memory resources, <span id="textcolor17">RDMA</span> uses a special put/get
+interface to access remote memory resources. Typically, this service is provided
+through the network interface and managed by software. This interface allows
+RDMA systems to scale beyond what is possible in NUMA systems, at the
+cost of remote memory access performance and a more complex interface to
+applications.
+</p><!--l. 33--><p class="indent" >   <span id="textcolor18">RDMA</span> systems can scale to thousands of nodes and petabytes of memory<span class="cite">[<span 
+class="cmbx-10">?</span>]</span>.
+Performance can vary, and scales with deployment size, but modern Infiniband
+networks provide round-trip latencies of several microseconds (within a rack) and
+bandwidths of hundreds of gigabytes per second<span class="cite">[<span 
+class="cmbx-10">?</span>]</span>. These systems have historically
+been considered costly and were primarily deployed in supercomputing environments,
+                                                                  
+
+                                                                  
+but recent Ethernet-based implementations have made them increasingly
+accessible<span class="cite">[<span 
+class="cmbx-10">?</span>]</span>.
+</p>
+<!--l. 42--><p class="noindent" ><span class="paragraphHead"><a 
+ id="x1-70002.1.1"></a><span 
+class="cmbx-10">Memory Semantic Fabrics</span></span>
+   Finally, a new class of interface has been recently introduced; the memory-semantic
+fabric. A memory-semantic fabric abstracts memory into a simple load-store interface
+(rather than technology-specific protocols). These interfaces are tightly coupled with
+the CPU, often loading memory directly into local caches or even registers. This
+abstraction enables heterogeneous memory technologies in flexible topologies.
+Memory thus becomes a first-class citizen (often called a ”memory blade”) on a
+memory-optimized interconnect. The hope is that such interfaces will allow for
+greater scalability and flexibility than NUMA, while providing a more direct interface
+than RDMA. There are several commercial consortia developing cache-coherent
+interconnects for integrating accelerators and memories within a rack <span class="cite">[<span 
+class="cmbx-10">?</span>]</span><span class="cite">[<span 
+class="cmbx-10">?</span>]</span>. Some
+academic projects have focused on scaling NUMA by increasing the level of
+abstraction (e.g., <span class="cite">[<span 
+class="cmbx-10">?</span>]</span><span class="cite">[<span 
+class="cmbx-10">?</span>]</span>). Finally, an industrial effort called Gen-Z provides a
+more general interface that can connect memory, accelerators, and storage
+using memory-oriented operations (like load and store)<span class="cite">[<span 
+class="cmbx-10">?</span>]</span>. While Gen-Z
+does not include cache-coherence in the core specification, it can be added
+through custom commands between devices that require it. It remains to
+be seen how these new interconnects balance performance, scalability, and
+cost.
+</p><!--l. 62--><p class="noindent" >
+</p>
+   <h5 class="subsubsectionHead"><span class="titlemark">2.1.2   </span> <a 
+ id="x1-80002.1.2"></a>Software Interfaces</h5>
+<!--l. 62--><p class="noindent" >The low level interfaces listed above do not necessarily mandate a particular software
+interface. NUMA systems typically expose a virtual memory abstraction to
+applications. In this case, the OS manages mappings from virtual to physical
+addresses while hardware uses those mappings to automatically route loads and
+stores to the appropriate memory resources. The OS is also responsible for
+choosing which NUMA domain to allocate memory from. This can be a
+complex decision and much effort has gone into studying such allocation
+policies<span class="cite">[<span 
+class="cmbx-10">?</span>]</span>.
+</p><!--l. 71--><p class="indent" >   RDMA systems are further divorced from specific hardware interfaces and enjoy a
+great diversity of interfaces. Some programming languages use a partitioned global
+address space to make it appear as if language-level variables are all directly
+accessible<span class="cite">[<span 
+class="cmbx-10">?</span>]</span><span class="cite">[<span 
+class="cmbx-10">?</span>]</span>. Other systems use RDMA more directly to accelerate applications
+such as key-value stores<span class="cite">[<span 
+class="cmbx-10">?</span>]</span><span class="cite">[<span 
+class="cmbx-10">?</span>]</span>.
+</p><!--l. 78--><p class="indent" >   Memory-semantic fabrics are newer and it is not clear how their interfaces should
+be exposed. By coupling tightly with CPUs, it is possible to address them directly
+using virtual memory. However, it may be desirable to allow applications to choose
+                                                                  
+
+                                                                  
+which memory they access, or have more abstracted interfaces (e.g., disk-like).
+Furthermore, these fabrics are designed to support highly heterogeneous memory
+technologies. This has lead to page-migration proposals that try to manage
+performance and durability requirements either explicitly in the application, or
+transparently in the OS<span class="cite">[<span 
+class="cmbx-10">?</span>]</span><span class="cite">[<span 
+class="cmbx-10">?</span>]</span>.
+</p><!--l. 88--><p class="indent" >   In this paper, we will focus on a very general interface called demand paging
+(covered in detail in the next section) that can be implemented under any of the
+low-level interfaces listed here. We assume a system that allows block reads and
+writes to remote memory resources. In a <span id="textcolor19">NUMA</span> system, this would translate to
+page migration. For <span id="textcolor20">RDMA</span>, we would allocate memory from under-utilized
+nodes to store pages from oversubscribed nodes (as was done in <span class="cite">[<span 
+class="cmbx-10">?</span>]</span>). In the
+memory-semantic approach, dedicated memory blades would be used for remote
+memory and transfers would be initiated directly from the client CPUs (e.g., using
+<span 
+class="cmti-10">memcpy()</span>).
+</p>
+   <h4 class="subsectionHead"><span class="titlemark">2.2   </span> <a 
+ id="x1-90002.2"></a>OS Paging Background</h4>
+<!--l. 1--><p class="noindent" >Many architectures and operating systems expose virtual memory and paging
+abstractions. While most interfaces are fairly similar, we will use the RISC-V ISA
+(privileged architecture version 1.10<span class="cite">[<span 
+class="cmbx-10">?</span>]</span>), and Linux version 4.15<span class="cite">[<span 
+class="cmbx-10">?</span>]</span> for most examples
+in this paper.
+</p><!--l. 6--><p class="indent" >   Figure <a 
+href="#x1-90011">1<!--tex4ht:ref: fig:generic_paging_flow --></a> shows a typical flow for translating a virtual address. Most translations
+occur completely in hardware and require no immediate OS intervention. However,
+when physical memory is constrained, the operating system may choose to store
+logical pages in secondary storage (called “paging”). This effectively treats main
+memory as a software-managed cache for the storage device. In this case, some
+mappings are invalid (not present in physical memory) and require immediate OS
+intervention (a page fault) to resolve. Throughout this paper, we will refer to the
+logical data as a “page”, and the physical location in memory as the “page-frame” or
+simply “frame”.
+</p>
+   <hr class="figure" /><div class="figure" 
+>
+                                                                  
+
+                                                                  
+<a 
+ id="x1-90011"></a>
+                                                                  
+
+                                                                  
+<!--l. 19--><p class="noindent" > <img 
+src="figs/generic_paging-.png" alt="PIC" 
+ />
+<br /> </p><div class="caption" 
+><span class="id">Figure 1: </span><span  
+class="content">Flow chart for virtual to physical address look up in a typical virtual
+memory system. The translation look aside buffer (TLB) caches translations.
+The page-table walker (PTW) fetches mappings from main memory when the
+TLB misses. Most mappings are valid and can be returned directly to the CPU,
+but invalid mappings result in a trap to the OS.</span></div><!--tex4ht:label?: x1-90011 -->
+                                                                  
+
+                                                                  
+   </div><hr class="endfigure" />
+<!--l. 28--><p class="indent" >   There are three main contributors to page fault time: trap time, processing, and
+backing store access. Our experiments on an Intel Haswell CPU (running at 2.6 GHz)
+show that it takes approximately 800 ns from the time a fault occurs, to
+when the OS begins executing the page fault handler. The OS then spends
+anywhere from 4.5 <span 
+class="tcrm-1000">µ</span>s to 13 <span 
+class="tcrm-1000">µ</span>s processing the fault. With backing store access
+times measured in milliseconds (for e.g. a spinning hard disk), this time is
+insignificant. However, remote memory systems promise access latencies on the
+order of several microseconds, making page-fault processing a significant
+overhead.
+</p>
+   <hr class="figure" /><div class="figure" 
+>
+                                                                  
+
+                                                                  
+<a 
+ id="x1-90022"></a>
+                                                                  
+
+                                                                  
+<!--l. 40--><p class="noindent" ><img 
+src="figs/paging_overhead.png" alt="PIC"  
+ />
+<br /> </p><div class="caption" 
+><span class="id">Figure 2:  </span><span  
+class="content">Application  slow-down  when  paging  to  local  memory.  Memory
+oversubscription refers to the percent of peak memory that was stored remotely.</span></div><!--tex4ht:label?: x1-90022 -->
+                                                                  
+
+                                                                  
+   </div><hr class="endfigure" />
+<!--l. 46--><p class="indent" >   To demonstrate this, we modified the Linux kernel to swap to pre-allocated
+DRAM buffers in local memory instead of an external device. This effectively
+eliminates backing store access times and directly measures the overhead of using
+paging at all. Figure <a 
+href="#x1-90022">2<!--tex4ht:ref: fig:paging_overhead --></a> plots several benchmarks’ runtime as they are run under
+increasingly memory constrained environments. Note that even without waiting for
+secondary storage, applications can slow down by as much as 12.5x due to paging
+overheads.
+</p>
+   <h3 class="sectionHead"><span class="titlemark">3   </span> <a 
+ id="x1-100003"></a>Page Fault Accelerator</h3>
+   <hr class="figure" /><div class="figure" 
+>
+                                                                  
+
+                                                                  
+<a 
+ id="x1-100013"></a>
+                                                                  
+
+                                                                  
+<!--l. 3--><p class="noindent" > <img 
+src="figs/generic_pfa-.png" alt="PIC"  
+ />
+<br /> </p><div class="caption" 
+><span class="id">Figure 3: </span><span  
+class="content">Paging with the PFA. Instead of an invalid PTE causing a trap to
+the OS (as in figure <span 
+class="cmbx-10">??</span>), invalid pages are passed to the PFA to be fetched from
+remote memory. The PFA may still cause a trap if it cannot handle the request
+(e.g., full queues).</span></div><!--tex4ht:label?: x1-100013 -->
+                                                                  
+
+                                                                  
+   </div><hr class="endfigure" />
+<!--l. 11--><p class="indent" >   Much of the work done during a page fault, while important, does not strictly
+need to occur in order for the application thread to make progress. For example,
+allocating free frames or updating page meta-data could be performed at any time.
+Other tasks may be more efficient in hardware than in the OS; the walking of
+page-tables for example. We propose a hardware accelerator that performs only the
+bare-minimum of copying a remote page into a pre-allocated frame, updating
+the relevant <span id="textcolor21">page table entry (PTE)</span>, and restarting the application (figure
+<a 
+href="#x1-100013">3<!--tex4ht:ref: fig:pfa_generic --></a>).
+</p><!--l. 20--><p class="indent" >   While this does not eliminate the need for software management of page
+meta-data (here referred to as <span id="textcolor22">bookkeeping</span>), it does provide considerable flexibility
+to the OS in how such <span id="textcolor23">tasks</span> get scheduled. Figure <a 
+href="#x1-100024">4<!--tex4ht:ref: fig:bookkeeping_timeline --></a> illustrates the difference
+from the perspective of the OS. One immediate benefit is that the OS can
+schedule this bookkeeping thread on idle resources, e.g. while the application
+is blocked on I/O. Another benefit is that bookkeeping tasks can now be
+batched. Batching improves cache locality and amortizes context switch
+overheads.
+</p>
+   <hr class="figure" /><div class="figure" 
+>
+                                                                  
+
+                                                                  
+<a 
+ id="x1-100024"></a>
+                                                                  
+
+                                                                  
+<!--l. 31--><p class="noindent" > <img 
+src="figs/bookkeeping_timeline-.png" alt="PIC"  
+ />
+<br /> </p><div class="caption" 
+><span class="id">Figure 4: </span><span  
+class="content">Timeline of page-fault processing with and without the PFA. Without
+the PFA, the OS must be invoked on every page miss and perform various
+data structure look ups to decide how to handle the fault. The PFA allows this
+bookkeeping to occur any time after the fetch in a separate kernel thread. Only
+the actual page read must occur before the application can be restarted.</span></div><!--tex4ht:label?: x1-100024 -->
+                                                                  
+
+                                                                  
+   </div><hr class="endfigure" />
+   <h4 class="subsectionHead"><span class="titlemark">3.1   </span> <a 
+ id="x1-110003.1"></a>Page Fault Accelerator Design</h4>
+<!--l. 1--><p class="noindent" >The primary interface to the PFA is through a number of memory-mapped queues:
+<span id="textcolor24">FreeQ</span>, <span id="textcolor25">NewQ</span>, and <span id="textcolor26">EvictQ</span>. The <span id="textcolor27">FreeQ</span> contains unused page frames that the PFA
+can use for fetching new pages, the <span id="textcolor28">NewQ</span> reports any recently fetched pages to the
+OS bookkeeping thread, and the <span id="textcolor29">EvictQ</span> contains a list of local pages that should
+be stored in remote memory. Using these queues, execution proceeds as
+follows:
+</p>
+<!--l. 8--><p class="noindent" ><span class="paragraphHead"><a 
+ id="x1-120003.1"></a><span 
+class="cmbx-10">Eviction</span></span>
+   The PFA handles all communication with the memory blade. This includes page
+eviction. The basic procedure is as follows (see figure <a 
+href="#x1-120115">5<!--tex4ht:ref: fig:evict_detail --></a>):
+</p><!--l. 13--><p class="indent" >
+     </p><ol  class="enumerate1" >
+     <li 
+  class="enumerate" id="x1-12002x1">The OS identifies pages that should be stored remotely.
+     </li>
+     <li 
+  class="enumerate" id="x1-12004x2">It evicts them explicitly by writing to the <span id="textcolor30">EvictQ</span>.
+     </li>
+     <li 
+  class="enumerate" id="x1-12006x3">The PFA sends a remote memory write command to the NIC which reads
+     the page through DMA and sends it to remote memory.
+     </li>
+     <li 
+  class="enumerate" id="x1-12008x4">When the send is complete, the PFA updates the <span id="textcolor31">EvictQ</span> status to notify
+     the OS.
+     </li>
+     <li 
+  class="enumerate" id="x1-12010x5">The OS stores a page identifier in the PTE and marks it as remote once
+     the PFA eviction is complete.</li></ol>
+   <hr class="figure" /><div class="figure" 
+>
+                                                                  
+
+                                                                  
+<a 
+ id="x1-120115"></a>
+                                                                  
+
+                                                                  
+<!--l. 24--><p class="noindent" > <img 
+src="figs/pfa_evict_detail-.png" alt="PIC"  
+ />
+<br /> </p><div class="caption" 
+><span class="id">Figure 5: </span><span  
+class="content">Detailed eviction flow</span></div><!--tex4ht:label?: x1-120115 -->
+                                                                  
+
+                                                                  
+   </div><hr class="endfigure" />
+<!--l. 29--><p class="indent" >   In addition to the three main queues, there are a number of other maintenance
+registers that are used for querying queue status and initializing the PFA. I will
+mention one status register here; the EVICT_STAT register. When a page is placed
+on the evict queue, the PFA begins transferring it to remote memory, but does not
+block the OS. This allows the OS to perform useful work while the eviction is taking
+place, potentially hiding some of the write latency. In order to re-use the page frame,
+however, the OS must poll the EVICT_STAT register to ensure the write has
+completed.
+</p>
+<!--l. 38--><p class="noindent" ><span class="paragraphHead"><a 
+ id="x1-130003.1"></a><span 
+class="cmbx-10">Fetch</span></span>
+   The primary function of the PFA is to automatically fetch pages from remote
+memory when an application tries to access it. It does this by detecting page
+table entries that are marked remote and transparently re-mapping them to
+the next available free frame. The basic operation is as follows (see figure
+<a 
+href="#x1-130136">6<!--tex4ht:ref: fig:fetch_detail --></a>):
+</p><!--l. 46--><p class="indent" >
+     </p><ol  class="enumerate1" >
+     <li 
+  class="enumerate" id="x1-13002x1">Application code issues a load/store for the (now remote) page.
+     </li>
+     <li 
+  class="enumerate" id="x1-13004x2">The TLB and PTW detect a remote page and request it from the PFA
+     </li>
+     <li 
+  class="enumerate" id="x1-13006x3">The PFA issues a remote memory read command to the NIC, providing
+     the next available frame from the <span id="textcolor32">FreeQ</span>.
+     </li>
+     <li 
+  class="enumerate" id="x1-13008x4">The PFA clears the remote bit in the <span id="textcolor33">PTE</span>.
+     </li>
+     <li 
+  class="enumerate" id="x1-13010x5">The PFA pushes the virtual address of the fetched page to the NewQ.
+     </li>
+     <li 
+  class="enumerate" id="x1-13012x6">The application is restarted.</li></ol>
+   <hr class="figure" /><div class="figure" 
+>
+                                                                  
+
+                                                                  
+<a 
+ id="x1-130136"></a>
+                                                                  
+
+                                                                  
+<!--l. 56--><p class="noindent" > <img 
+src="figs/pfa_fetch_detail-.png" alt="PIC"  
+ />
+<br /> </p><div class="caption" 
+><span class="id">Figure 6: </span><span  
+class="content">Detailed fetch flow</span></div><!--tex4ht:label?: x1-130136 -->
+                                                                  
+
+                                                                  
+   </div><hr class="endfigure" />
+<!--l. 62--><p class="noindent" ><span class="paragraphHead"><a 
+ id="x1-140003.1"></a><span 
+class="cmbx-10">Metadata Management</span></span>
+   The OS should ensure that there are sufficient free frames in the <span id="textcolor34">FreeQ</span> to
+ensure smooth operation. If a remote page is requested and there are no
+free frames, the PFA will trap to the OS with a conventional page-fault.
+The OS must enqueue one or more free-frames before returning from the
+interrupt. This may involve evicting pages synchronously in the page-fault
+handler.
+</p><!--l. 69--><p class="indent" >   Similarly, the OS needs to drain the new page queue periodically to ensure it
+does not overflow. This will also trap to the OS with a conventional page
+fault.
+</p><!--l. 115--><p class="noindent" >
+</p>
+   <h5 class="subsubsectionHead"><span class="titlemark">3.1.1   </span> <a 
+ id="x1-150003.1.1"></a>Remote Memory Interface</h5>
+<!--l. 116--><p class="noindent" >The PFA requires some hardware-accessible interface to remote memory. This could
+be through a memory semantic fabric or RDMA-enabled network (such as
+Infiniband or RoCE). In our design, we use a custom implementation of RDMA
+over ethernet to a dedicated memory blade. This interface is accessible to
+both software (through a Linux driver) and the PFA (through an on-chip
+network).
+</p><!--l. 38--><p class="noindent" >
+</p>
+   <h3 class="sectionHead"><span class="titlemark">4   </span> <a 
+ id="x1-160004"></a>Implementation</h3>
+<!--l. 1--><p class="noindent" >The PFA was implemented within the RISC-V ecosystem. RISC-V is an open-source
+instruction set with several open and closed-source implementations and ports for
+many common software components<span class="cite">[<span 
+class="cmbx-10">?</span>]</span>.
+</p><!--l. 19--><p class="noindent" >
+</p>
+   <h4 class="subsectionHead"><span class="titlemark">4.1   </span> <a 
+ id="x1-170004.1"></a>Hardware Implementation</h4>
+<!--l. 20--><p class="noindent" >The PFA prototype was implemented in the Chisel hardware construction
+language<span class="cite">[<span 
+class="cmbx-10">?</span>]</span> and integrated with a simple in-order CPU called RocketCore<span class="cite">[<span 
+class="cmbx-10">?</span>]</span>. The
+components were integrated using the RocketChip system-on-chip (SoC) generator<span class="cite">[<span 
+class="cmbx-10">?</span>]</span>.
+We provide an overview of the relevant systems in the following sections. The current
+PFA prototype implements a subset of the specification described in Section <a 
+href="#x1-110003.1">3.1<!--tex4ht:ref: sec:pfaDesign --></a>.
+Specifically, it does not support multiple simultaneous evictions (the EvictQ has an
+effective depth of 1), however, it does allow for asynchronous eviction. This
+prevents optimizations such as switching to other threads while many pages are
+                                                                  
+
+                                                                  
+simultaneously evicted (a single eviction does not take long enough to justify a
+context switch).
+</p><!--l. 32--><p class="noindent" >
+</p>
+   <h5 class="subsubsectionHead"><span class="titlemark">4.1.1   </span> <a 
+ id="x1-180004.1.1"></a>RocketCore and RocketChip</h5>
+<!--l. 33--><p class="noindent" >RocketChip<span class="cite">[<span 
+class="cmbx-10">?</span>]</span> is a framework for generating SoCs. It includes on-chip interconnects,
+caches, and other utilities for chip construction. While the CPU is pluggable, we use
+only a single RocketCore in-order CPU for our experiments. Our implementation
+used dedicated 16KB instruction and data caches . While the node had access to
+several gigabytes of main memory, we artificially limited application memory using
+Linux cgroups (see Section <a 
+href="#x1-240005">5<!--tex4ht:ref: sec:eval --></a> for details). A real <span id="textcolor35">WSC</span> would likely include a mixture
+of simple cores, high single-thread performance cores, and accelerators. We hope to
+evaluate the Berkeley out-of-order core (BOOM<span class="cite">[<span 
+class="cmbx-10">?</span>]</span>) and the Hwatcha vector
+accelerator<span class="cite">[<span 
+class="cmbx-10">?</span>]</span> in the future when they become available in our simulation
+infrastructure.
+</p><!--l. 45--><p class="noindent" >
+</p>
+   <h5 class="subsubsectionHead"><span class="titlemark">4.1.2   </span> <a 
+ id="x1-190004.1.2"></a>FireSim</h5>
+<!--l. 46--><p class="noindent" >We simulated the RTL using a cycle-accurate simulator called ”FireSim”<span class="cite">[<span 
+class="cmbx-10">?</span>]</span>. FireSim
+is an FPGA-accelerated simulator that runs on the Amazon cloud. It can
+simulate thousands of nodes with a cycle-accurate network and heterogeneous
+components. Many parameters of the simulation are tunable within FireSim. We
+decided on a 200 Gbit/s network with 500 ns link latency, leading to roughly
+2us page access time to the memory blade (similar to current infiniband
+networks).
+</p>
+   <hr class="figure" /><div class="figure" 
+>
+                                                                  
+
+                                                                  
+<a 
+ id="x1-190017"></a>
+                                                                  
+
+                                                                  
+<div class="tabular"> <table id="TBL-2" class="tabular" 
+cellspacing="0" cellpadding="0"  
+><colgroup id="TBL-2-1g"><col 
+id="TBL-2-1" /></colgroup><colgroup id="TBL-2-2g"><col 
+id="TBL-2-2" /></colgroup><tr 
+class="hline"><td><hr /></td><td><hr /></td></tr><tr  
+ style="vertical-align:baseline;" id="TBL-2-1-"><td  style="white-space:nowrap; text-align:left;" id="TBL-2-1-1"  
+class="td11"> <span 
+class="cmbx-10">CPU Type            </span></td><td  style="white-space:nowrap; text-align:left;" id="TBL-2-1-2"  
+class="td11"> Rocket (5-stage in order)  </td>
+</tr><tr 
+class="hline"><td><hr /></td><td><hr /></td></tr><tr  
+ style="vertical-align:baseline;" id="TBL-2-2-"><td  style="white-space:nowrap; text-align:left;" id="TBL-2-2-1"  
+class="td11"> <span 
+class="cmbx-10">CPU Frequency       </span></td><td  style="white-space:nowrap; text-align:left;" id="TBL-2-2-2"  
+class="td11"> 3.2 GHz                        </td>
+</tr><tr 
+class="hline"><td><hr /></td><td><hr /></td></tr><tr  
+ style="vertical-align:baseline;" id="TBL-2-3-"><td  style="white-space:nowrap; text-align:left;" id="TBL-2-3-1"  
+class="td11"> <span 
+class="cmbx-10">Caches                  </span></td><td  style="white-space:nowrap; text-align:left;" id="TBL-2-3-2"  
+class="td11"> 16 kB D$ and I$             </td>
+</tr><tr 
+class="hline"><td><hr /></td><td><hr /></td></tr><tr  
+ style="vertical-align:baseline;" id="TBL-2-4-"><td  style="white-space:nowrap; text-align:left;" id="TBL-2-4-1"  
+class="td11"> <span 
+class="cmbx-10">NW Topology         </span></td><td  style="white-space:nowrap; text-align:left;" id="TBL-2-4-2"  
+class="td11"> Single Switch                 </td>
+</tr><tr 
+class="hline"><td><hr /></td><td><hr /></td></tr><tr  
+ style="vertical-align:baseline;" id="TBL-2-5-"><td  style="white-space:nowrap; text-align:left;" id="TBL-2-5-1"  
+class="td11"> <span 
+class="cmbx-10">NW Bandwidth       </span></td><td  style="white-space:nowrap; text-align:left;" id="TBL-2-5-2"  
+class="td11"> 200 Gbit/s                     </td>
+</tr><tr 
+class="hline"><td><hr /></td><td><hr /></td></tr><tr  
+ style="vertical-align:baseline;" id="TBL-2-6-"><td  style="white-space:nowrap; text-align:left;" id="TBL-2-6-1"  
+class="td11"> <span 
+class="cmbx-10">NW Link Latency    </span></td><td  style="white-space:nowrap; text-align:left;" id="TBL-2-6-2"  
+class="td11"> 2 <span 
+class="tcrm-1000">µ</span>s                              </td>
+</tr><tr 
+class="hline"><td><hr /></td><td><hr /></td></tr><tr  
+ style="vertical-align:baseline;" id="TBL-2-7-"><td  style="white-space:nowrap; text-align:left;" id="TBL-2-7-1"  
+class="td11"> <span 
+class="cmbx-10">Remote Page Read  </span></td><td  style="white-space:nowrap; text-align:left;" id="TBL-2-7-2"  
+class="td11"> 4.8 <span 
+class="tcrm-1000">µ</span>s                            </td>
+</tr><tr 
+class="hline"><td><hr /></td><td><hr /></td></tr><tr  
+ style="vertical-align:baseline;" id="TBL-2-8-"><td  style="white-space:nowrap; text-align:left;" id="TBL-2-8-1"  
+class="td11"> <span 
+class="cmbx-10">Remote Page Write  </span></td><td  style="white-space:nowrap; text-align:left;" id="TBL-2-8-2"  
+class="td11"> 4.8 <span 
+class="tcrm-1000">µ</span>s                            </td>
+</tr><tr 
+class="hline"><td><hr /></td><td><hr /></td></tr><tr  
+ style="vertical-align:baseline;" id="TBL-2-9-"><td  style="white-space:nowrap; text-align:left;" id="TBL-2-9-1"  
+class="td11">                     </td></tr></table></div>
+<br /> <div class="caption" 
+><span class="id">Figure 7: </span><span  
+class="content">System parameters used for evaluation.</span></div><!--tex4ht:label?: x1-190017 -->
+                                                                  
+
+                                                                  
+   </div><hr class="endfigure" />
+   <h4 class="subsectionHead"><span class="titlemark">4.2   </span> <a 
+ id="x1-200004.2"></a>Linux Integration</h4>
+<!--l. 1--><p class="noindent" >We modified the Linux kernel (version 4.15<span class="cite">[<span 
+class="cmbx-10">?</span>]</span>) to support the PFA. The majority of
+software development was done using the functional simulator.
+</p><!--l. 94--><p class="noindent" >
+</p>
+   <h5 class="subsubsectionHead"><span class="titlemark">4.2.1   </span> <a 
+ id="x1-210004.2.1"></a>PFA Modifications</h5>
+<!--l. 95--><p class="noindent" >The introduction of a PFA changes a number of the assumptions underlying baseline
+paging behavior. Figure <a 
+href="#x1-210018">8<!--tex4ht:ref: fig:linux_changes --></a> summarizes these changes.
+</p>
+   <hr class="figure" /><div class="figure" 
+>
+                                                                  
+
+                                                                  
+<a 
+ id="x1-210018"></a>
+                                                                  
+
+                                                                  
+<!--l. 100--><p class="noindent" > <img 
+src="./figs/linux_changes-.png" alt="PIC"  
+ />
+<br /> </p><div class="caption" 
+><span class="id">Figure 8: </span><span  
+class="content">Major changes to Linux paging to accommodate the PFA. Most
+subsystems could be re-used without change. On the eviction path, all that
+was  changed  was  the  PTE  update  (to  write  a  remote  <span id="textcolor36">PTE</span>  instead  of  a
+<span id="textcolor37">swap_entry_t</span>), and the write to disk (to write to remote memory instead). The
+bookkeeping path is now triggered either from the page-fault handler (due to
+a PFA service request) or from <span id="textcolor38">kpfad</span>. The core bookkeeping function remains
+unmodified.</span></div><!--tex4ht:label?: x1-210018 -->
+                                                                  
+
+                                                                  
+   </div><hr class="endfigure" />
+   <h5 class="subsubsectionHead"><span class="titlemark">4.2.2   </span> <a 
+ id="x1-220004.2.2"></a>kpfad</h5>
+<!--l. 185--><p class="noindent" >The most basic implementation of PFA support in Linux simply performs
+bookkeeping tasks whenever the internal queues of the PFA fill up. This effectively
+batches page bookkeeping, but it does not allow the kernel to choose when the
+bookkeeping occurs. To leverage idle periods in program execution, or unused
+hardware threads, we implement a background bookkeeping daemon called <span id="textcolor39">kpfad</span>.
+<span id="textcolor40">Kpfad</span> is triggered by an adaptive timer that attempts to discover the average time
+between full queues. It does this by increasing the wait time by a small amount every
+time it runs, and decreasing the time whenever the application is interrupted due to
+full queues. While <span id="textcolor41">kpfad</span> gives increased flexibility and efficiency on a lightly loaded
+system, it causes strictly more overhead than interrupt-driven bookkeeping
+when the application has enough work to keep all hardware threads busy
+(since the adaptive timer is not perfect). To avoid this, <span id="textcolor42">kpfad</span> is run with
+very low priority (similar to the page-out daemon <span id="textcolor43">kswapd</span>). Unlike <span id="textcolor44">kswapd</span>,
+however, <span id="textcolor45">kpfad</span> does not get triggered by a soft limit. We expect the adaptive
+timer scheme, coupled with low priority, to be sufficient to avoid significant
+overhead.
+</p><!--l. 203--><p class="noindent" >
+</p>
+   <h5 class="subsubsectionHead"><span class="titlemark">4.2.3   </span> <a 
+ id="x1-230004.2.3"></a>Baseline Swapping</h5>
+<!--l. 204--><p class="noindent" >We modified Linux to use the remote memory blade while paging. This was done by
+implementing a software interface to the remote memory blade as a <span id="textcolor46">transcendent
+memory (TMem)</span> device. The swapping mechanism uses a custom NIC driver that
+provides zero-copy semantics and bypasses the normal Linux networking
+stack.
+</p><!--l. 41--><p class="noindent" >
+</p>
+   <h3 class="sectionHead"><span class="titlemark">5   </span> <a 
+ id="x1-240005"></a>Evaluation</h3>
+<!--l. 1--><p class="noindent" >
+</p>
+   <h4 class="subsectionHead"><span class="titlemark">5.1   </span> <a 
+ id="x1-250005.1"></a>Experimental Design</h4>
+<!--l. 2--><p class="noindent" >Our evaluation is based on two benchmarks with significantly different access
+patterns. The first is quicksort (Qsort). This benchmark first allocates a large array
+of random numbers, and then sorts it using the well-known quicksort algorithm.
+Quicksort is a divide and conquer algorithm that automatically partitions the input
+                                                                  
+
+                                                                  
+array into small local blocks before performing a final sort. This leads to excellent
+cache behavior and predictable access patterns. Furthermore, by allocating the input
+array dynamically, quicksort performs no file I/O, so it is never blocked on I/O or
+other OS interactions.
+</p><!--l. 12--><p class="indent" >   The other benchmark is a de-novo genome assembly benchmark (Gen). Gen
+begins by loading a large text file that represents raw genome data. Raw genome
+data consists of short, overlapping, sequences of base-pairs called ”contigs”, the
+goal is to align these overlapping contigs into a single contiguous sequence
+representing a genome. This is done by loading contigs into a large hash table
+and probing into it repeatedly to find matching sequences. This leads to
+very little locality and unpredictable access patterns. Furthermore, Gen
+performs file I/O on the input, which allows for more complex OS interactions.
+<br 
+class="newline" /><br 
+class="newline" /></p><!--l. 23-->
+   <div class="lstlisting" id="listing-1"><span class="label"><a 
+ id="x1-25001r1"></a></span><span 
+class="cmtt-10">#</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">Data</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">Schema</span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-25002r2"></a></span><span 
+class="cmtt-10">result</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">=</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">NamedTuple</span><span 
+class="cmtt-10">(</span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-25003r3"></a></span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">’</span><span 
+class="cmtt-10">mean</span><span 
+class="cmtt-10">’,</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">#</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">Mean</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">results</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">from</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">10</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">runs</span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-25004r4"></a></span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">’</span><span 
+class="cmtt-10">std</span><span 
+class="cmtt-10">’,</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">#</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">Standard</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">deviation</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">from</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">10</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">runs</span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-25005r5"></a></span><span 
+class="cmtt-10">)</span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-25006r6"></a></span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-25007r7"></a></span><span 
+class="cmtt-10">#</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">mean</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">and</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">std</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">have</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">the</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">same</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">set</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">of</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">keys</span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-25008r8"></a></span><span 
+class="cmtt-10">result</span><span 
+class="cmtt-10">.</span><span 
+class="cmtt-10">mean</span><span 
+class="cmtt-10">.</span><span 
+class="cmtt-10">keys</span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-25009r9"></a></span><span 
+class="cmtt-10">[</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">’</span><span 
+class="cmtt-10">t_run</span><span 
+class="cmtt-10">’,</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">’</span><span 
+class="cmtt-10">t_bookkeeping</span><span 
+class="cmtt-10">’,</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">’</span><span 
+class="cmtt-10">t_rmem_write</span><span 
+class="cmtt-10">’,</span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-25010r10"></a></span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">’</span><span 
+class="cmtt-10">t_rmem_read</span><span 
+class="cmtt-10">’,</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">’</span><span 
+class="cmtt-10">n_fault</span><span 
+class="cmtt-10">’,</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">’</span><span 
+class="cmtt-10">t_fault</span><span 
+class="cmtt-10">’,</span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-25011r11"></a></span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">’</span><span 
+class="cmtt-10">n_swapfault</span><span 
+class="cmtt-10">’,</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">’</span><span 
+class="cmtt-10">n_pfa_fault</span><span 
+class="cmtt-10">’,</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">’</span><span 
+class="cmtt-10">n_early_newq</span><span 
+class="cmtt-10">’,</span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-25012r12"></a></span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">’</span><span 
+class="cmtt-10">n_evicted</span><span 
+class="cmtt-10">’,</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">’</span><span 
+class="cmtt-10">n_fetched</span><span 
+class="cmtt-10">’,</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">’</span><span 
+class="cmtt-10">n_kpfad</span><span 
+class="cmtt-10">’,</span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-25013r13"></a></span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">’</span><span 
+class="cmtt-10">t_kpfad</span><span 
+class="cmtt-10">’,</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">’</span><span 
+class="cmtt-10">slowdown</span><span 
+class="cmtt-10">’]</span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-25014r14"></a></span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-25015r15"></a></span><span 
+class="cmtt-10">#</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">Datasets</span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-25016r16"></a></span><span 
+class="cmtt-10">#</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">Paging</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">to</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">remote</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">memory</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">in</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">SW</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">(’</span><span 
+class="cmtt-10">baseline</span><span 
+class="cmtt-10">’)</span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-25017r17"></a></span><span 
+class="cmtt-10">base_res</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">=</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">ingest_run</span><span 
+class="cmtt-10">(’</span><span 
+class="cmtt-10">raw</span><span 
+class="cmtt-10">/</span><span 
+class="cmtt-10">results_baseline</span><span 
+class="cmtt-10">.</span><span 
+class="cmtt-10">csv</span><span 
+class="cmtt-10">’,</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">’</span><span 
+class="cmtt-10">rv</span><span 
+class="cmtt-10">’)</span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-25018r18"></a></span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-25019r19"></a></span><span 
+class="cmtt-10">#</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">Paging</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">using</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">the</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">PFA</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">to</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">real</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">memblade</span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-25020r20"></a></span><span 
+class="cmtt-10">pfa_res</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">=</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">ingest_run</span><span 
+class="cmtt-10">(’</span><span 
+class="cmtt-10">raw</span><span 
+class="cmtt-10">/</span><span 
+class="cmtt-10">results_pfa</span><span 
+class="cmtt-10">.</span><span 
+class="cmtt-10">csv</span><span 
+class="cmtt-10">’,</span><span 
+class="cmtt-10"> </span><span 
+class="cmtt-10">’</span><span 
+class="cmtt-10">rv</span><span 
+class="cmtt-10">’)</span>
+   
+   </div>
+<!--l. 47--><p class="noindent" >
+</p>
+   <h4 class="subsectionHead"><span class="titlemark">5.2   </span> <a 
+ id="x1-260005.2"></a>End-to-End Performance</h4>
+<!--l. 48--><p class="noindent" >The benchmarks were both run under a cgroup in Linux in order to reduce the
+available memory and emulate a system where applications would need to share
+limited local memory. This is the same mechanism that system administrators use
+today to control application memory consumption (e.g., in containers). In this
+experiment, we disable kpfad in order to isolate the batching of new-page
+management from the scheduling flexibility offered by kswapd’s asynchrony. The PFA
+was configured to allow up to 64 outstanding page faults before bookkeeping was
+performed. <br 
+class="newline" /><br 
+class="newline" /></p><!--l. 58--><div class="lstinputlisting">
+<a 
+ id="x1-26001"></a>
+   <span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-26002r1"></a></span><span 
+class="cmtt-10">CONFIG_PFA</span><span 
+class="cmtt-10">=</span><span 
+class="cmtt-10">y</span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-26003r2"></a></span><span 
+class="cmtt-10">CONFIG_PFA_EM</span><span 
+class="cmtt-10">=</span><span 
+class="cmtt-10">n</span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-26004r3"></a></span><span 
+class="cmtt-10">CONFIG_MEMBLADE_EM</span><span 
+class="cmtt-10">=</span><span 
+class="cmtt-10">n</span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-26005r4"></a></span><span 
+class="cmtt-10">CONFIG_PFA_VERBOSE</span><span 
+class="cmtt-10">=</span><span 
+class="cmtt-10">n</span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-26006r5"></a></span><span 
+class="cmtt-10">CONFIG_PFA_DEBUG</span><span 
+class="cmtt-10">=</span><span 
+class="cmtt-10">n</span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-26007r6"></a></span><span 
+class="cmtt-10">CONFIG_PFA_PFLAT</span><span 
+class="cmtt-10">=</span><span 
+class="cmtt-10">n</span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-26008r7"></a></span><span 
+class="cmtt-10">CONFIG_PFA_KPFAD</span><span 
+class="cmtt-10">=</span><span 
+class="cmtt-10">n</span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-26009r8"></a></span><span 
+class="cmtt-10">CONFIG_PFA_FREEQ_SIZE</span><span 
+class="cmtt-10">=64</span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-26010r9"></a></span><span 
+class="cmtt-10">CONFIG_PFA_NEWQ_SIZE</span><span 
+class="cmtt-10">=64</span><span 
+class="cmtt-10"> </span><br /><span class="label"><a 
+ id="x1-26011r10"></a></span><span 
+class="cmtt-10">CONFIG_PFA_EVICTQ_SIZE</span><span 
+class="cmtt-10">=1</span>
+   
+   </div>
+<!--l. 60--><p class="indent" >   Both applications use 64MB of memory at their peak. We then varied the cgroup
+memory limit from 100% (64MB) down to 25% (16MB), triggering increasing levels
+of paging. For both benchmarks, the PFA reduces end to end run time by up to
+1.4x.
+</p>
+   <hr class="figure" /><div class="figure" 
+>
+                                                                  
+
+                                                                  
+<a 
+ id="x1-260129"></a>
+                                                                  
+
+                                                                  
+<!--l. 66--><p class="noindent" ><img 
+src="figs/perf_nokswapd.png" alt="PIC"  
+ />
+<br /> </p><div class="caption" 
+><span class="id">Figure 9: </span><span  
+class="content">PFA vs Baseline without kswapd. Applications run approximately
+20-40% faster when the PFA is enabled.</span></div><!--tex4ht:label?: x1-260129 -->
+                                                                  
+
+                                                                  
+   </div><hr class="endfigure" />
+   <h5 class="subsubsectionHead"><span class="titlemark">5.2.1   </span> <a 
+ id="x1-270005.2.1"></a>Analysis</h5>
+<!--l. 74--><p class="noindent" >We now analyze the sources of this performance improvement.
+</p>
+<!--l. 76--><p class="noindent" ><span class="paragraphHead"><a 
+ id="x1-280005.2.1"></a><span 
+class="cmbx-10">Fetch Times</span></span>
+   We begin our analysis by looking at the key metric of average fetch time. This is
+the time between when an application attempts to access a remote page, and when it
+is able to continue processing. In this experiment, we use a simplified memory
+blade and network implementation with a constant 4 <span 
+class="tcrm-1000">µ</span>s access latency in
+order to better understand local overheads. Figure <a 
+href="#x1-2800211">11<!--tex4ht:ref: fig:fetch_breakdown --></a> plots the time for
+accessing a single remote page on an unloaded system. We classify time into four
+categories:
+</p>
+     <ul class="itemize1">
+     <li class="itemize"><span 
+class="cmbx-10">Trap: </span>The time for the hardware to detect an invalid access and context
+     switch to the OS.
+     </li>
+     <li class="itemize"><span 
+class="cmbx-10">Proc: </span>The time spent processing the page locally (overhead).
+     </li>
+     <li class="itemize"><span 
+class="cmbx-10">NIC: </span>The time spent interacting with the network interface.
+     </li>
+     <li class="itemize"><span 
+class="cmbx-10">MemBlade: </span>The time spent on the network and in the memory blade.</li></ul>
+<!--l. 95--><p class="indent" >   Recall from Section <a 
+href="#x1-100003">3<!--tex4ht:ref: sec:pfa --></a> (and Figure <a 
+href="#x1-100024">4<!--tex4ht:ref: fig:bookkeeping_timeline --></a> in particular) that the PFA moves some of
+this processing (especially <span 
+class="cmbx-10">Proc</span>) to an independent kernel thread; we account for
+this in a later section.
+</p>
+   <hr class="figure" /><div class="figure" 
+>
+                                                                  
+
+                                                                  
+<a 
+ id="x1-2800110"></a>
+                                                                  
+
+                                                                  
+<!--l. 101--><p class="noindent" ><img 
+src="figs/fetch_breakdown.png" alt="PIC"  
+ />
+<br /> </p><div class="caption" 
+><span class="id">Figure 10: </span><span  
+class="content">Breakdown of time in fetching a single remote page. All data are
+the average of 10 runs. Error bars represent standard deviation (but are almost
+too small to be seen). Note that local processing time (including the trap and
+NIC interaction) only accounts for 8% of time with the PFA, but accounts for
+over 50% of time for the baseline.</span></div><!--tex4ht:label?: x1-2800110 -->
+                                                                  
+
+                                                                  
+   </div><hr class="endfigure" />
+<!--l. 110--><p class="indent" >   Note that the trap overhead is a very small fraction of total time (just 113 ns).
+This is a result of using a simple in-order RISC core like Rocket. It is likely that this
+overhead may be more significant on a more complex architecture like server-grade
+x86 cores. Next, note that the time spent on the network and in the memory blade
+accounts for less than half the time in the baseline implementation, but completely
+dominates the PFA fetch time. This effect will be even more pronounced as network
+and memory blade performance improves. For example, if <span 
+class="cmbx-10">MemBlade </span>time
+were reduced to 1129 ns to simulate a 1 Tbit/s link with 1 <span 
+class="tcrm-1000">µ</span>s round-trip
+latency (as predicted in Section <span 
+class="cmbx-10">??</span> for photonic networks), then client-side
+processing would account for 83% of time in SW but only 23% of time with
+the PFA. Finally, note that the <span 
+class="cmbx-10">NIC </span>time in software is larger than the
+total time in the PFA. We believe this is due to a more efficient hardware to
+hardware interface between the PFA and the NIC. While not visible in the
+figure, the actual PFA-specific processing takes only 1 cycle in hardware,
+the remaining time is split between detecting and delivering the remote
+PTE to the PFA (<span 
+class="cmbx-10">Trap</span>), and interacting with the NIC (<span 
+class="cmbx-10">NIC</span>). The total
+time to fetch a page with the PFA is 2.2 times faster than in SW, but this
+does not tell the whole story; The PFA does not eliminate the work that is
+done during SW <span 
+class="cmbx-10">Proc</span>, it simply moves it to another thread. Likewise, the
+113 ns trap overhead may seem small, but this does not account for the
+effect that cache pollution from the handler has on the application when it
+restarts.
+</p>
+   <hr class="figure" /><div class="figure" 
+>
+                                                                  
+
+                                                                  
+<a 
+ id="x1-2800211"></a>
+                                                                  
+
+                                                                  
+<!--l. 136--><p class="noindent" ><img 
+src="figs/fetch_breakdown_fastmem.png" alt="PIC"  
+ />
+<br /> </p><div class="caption" 
+><span class="id">Figure 11:  </span><span  
+class="content">Breakdown  of  time  in  fetching  a  single  remote  page  from  a
+hypothetical fast memory blade with 1 <span 
+class="tcrm-1000">µ</span>s page read latency. As network and
+memory technology improves, the relative benefit of the PFA increases (from
+2.2x faster with the baseline memory blade to 4.6x faster with the optimistic
+memory blade).</span></div><!--tex4ht:label?: x1-2800211 -->
+                                                                  
+
+                                                                  
+   </div><hr class="endfigure" />
+<!--l. 145--><p class="noindent" ><span class="paragraphHead"><a 
+ id="x1-290005.2.1"></a><span 
+class="cmbx-10">Total Page Faults</span></span>
+   One key function of the PFA is to reduce the number of page faults due to paging.
+Recall from Section <span 
+class="cmbx-10">??</span> that there are many causes for faults (e.g., to perform
+copy-on-write), in Figure <a 
+href="#x1-2900112">12<!--tex4ht:ref: fig:pfa_swapfault --></a> I plot the number of paging-related faults each
+benchmark experiences as a fraction of total faults. The first thing to note is
+that the number paging-related faults decreases by approximately 64 when
+the PFA is used. This is because the PFA interrupts the OS to perform
+bookkeeping only when its queues are full (every 64 fetches in this experiment).
+However, these only account for 45% of faults, even in the worst-case (our
+simplest benchmark, Qsort) with 25% local memory. The more complex Gen
+benchmark has even fewer paging-related faults (as a fraction of total). While
+there are certainly some savings due to fewer kernel crossings, they are not
+frequent nor long enough to explain all the performance benefits we see
+end-to-end.
+</p>
+   <hr class="figure" /><div class="figure" 
+>
+                                                                  
+
+                                                                  
+<a 
+ id="x1-2900112"></a>
+                                                                  
+
+                                                                  
+<!--l. 162--><p class="noindent" ><img 
+src="figs/swapfault.png" alt="PIC"  
+ />
+<br /> </p><div class="caption" 
+><span class="id">Figure 12:  </span><span  
+class="content">Number  of  paging-related  faults  as  a  fraction  of  total  faults
+experienced.</span></div><!--tex4ht:label?: x1-2900112 -->
+                                                                  
+
+                                                                  
+   </div><hr class="endfigure" />
+<!--l. 168--><p class="noindent" ><span class="paragraphHead"><a 
+ id="x1-300005.2.1"></a><span 
+class="cmbx-10">Bookkeeping Time</span></span>
+   While we do reduce the number of paging-related faults, the kernel still needs to
+perform bookkeeping on the same number of pages. This batching means that more
+work is performed per page fault with the PFA. Figure <a 
+href="#x1-3000113">13<!--tex4ht:ref: fig:pfa_bk_prop --></a> shows total time spent
+bookkeeping, regardless of the number of page faults. What we see is that while the
+number of evicted pages is the same in both configurations, using the PFA leads to a
+2.5x reduction in bookkeeping time on average. The same code path is executed for
+each new page, but the PFA batches these events, leading to improved cache
+locality for the OS, and fewer cache-polluting page-faults for the application.
+The result is that, even in the worst case, the PFA spends less than half
+its time handling paging-related faults, while the baseline spends about
+80%.
+</p>
+   <hr class="figure" /><div class="figure" 
+>
+                                                                  
+
+                                                                  
+<a 
+ id="x1-3000113"></a>
+                                                                  
+
+                                                                  
+<!--l. 182--><p class="noindent" ><img 
+src="figs/bk_prop_all.png" alt="PIC"  
+ />
+<br /> </p><div class="caption" 
+><span class="id">Figure 13: </span><span  
+class="content">Proportion of Time Spent Bookkeeping</span></div><!--tex4ht:label?: x1-3000113 -->
+                                                                  
+
+                                                                  
+   </div><hr class="endfigure" />
+<!--l. 187--><p class="noindent" ><span class="paragraphHead"><a 
+ id="x1-310005.2.1"></a><span 
+class="cmbx-10">Scaling</span></span>
+   Figure <a 
+href="#x1-3100114">14<!--tex4ht:ref: fig:pfa_total_speedup --></a> shows the improvement in end-to-end runtime due to the PFA on our
+applications. While the improvement is significant (up to 40%), the savings are
+constant (there is no asymptotic improvement). This is because the PFA does not
+change any of the caching algorithms, and therefor experiences the same number of
+faults. This means that applications (such as Gen) that are not particularly
+cache-friendly can see significant slowdowns in a disaggregated environment, even
+with the PFA. Ultimately, the PFA pushes the boundaries of what is possible with
+cache-like interfaces, but it cannot change their fundamental limitations.
+Applications like Gen will need deeper changes to be viable on a disaggregated
+system.
+</p>
+   <hr class="figure" /><div class="figure" 
+>
+                                                                  
+
+                                                                  
+<a 
+ id="x1-3100114"></a>
+                                                                  
+
+                                                                  
+<!--l. 200--><p class="noindent" ><img 
+src="figs/total_speedup.png" alt="PIC"  
+ />
+<br /> </p><div class="caption" 
+><span class="id">Figure 14: </span><span  
+class="content">Total runtime improvement due to PFA</span></div><!--tex4ht:label?: x1-3100114 -->
+                                                                  
+
+                                                                  
+   </div><hr class="endfigure" />
+   <h3 class="sectionHead"><span class="titlemark">6   </span> <a 
+ id="x1-320006"></a>Future Work</h3>
+<!--l. 1--><p class="noindent" >So far, we have only experimented with a single client and memory blade. However,
+this does not capture all of the effects that contribute to performance. In
+particular, it would be valuable to understand congestion at both the memory
+blade, and in the network. Another effect that may surface as we experiment
+with more distributed applications is tail latency. The introduction of a
+remote page fault could increase tail latency significantly and would require
+mitigation.
+</p><!--l. 9--><p class="indent" >   Another topic not addressed by the current PFA and memory blade designs is
+that of management and security. How should memory blade capacity be allocated to
+applications? How can such allocations be authenticated? Simple payload encryption
+may not be sufficient to protect applications from attackers with network-level
+access.
+</p><!--l. 15--><p class="indent" >   Finally, while caching can be very effective for some workloads, it is not
+appropriate everywhere. Even within one workload, caching may be appropriate for
+some data structures, but not for others. To allow users maximum flexibility
+to choose between performance and convenience, we plan to implement a
+hybrid cache/scratchpad interface to remote memory (similar to <span class="cite">[<span 
+class="cmbx-10">?</span>]</span>). In this
+system, application memory would default to demand paging, but certain
+portions could be pinned in specially allocated regions of local memory. The
+application would then be responsible for directly writing to and from remote
+memory.
+</p><!--l. 47--><p class="noindent" >
+</p>
+   <h3 class="sectionHead"><span class="titlemark">7   </span> <a 
+ id="x1-330007"></a>Conclusion</h3>
+<!--l. 1--><p class="noindent" >Disaggregated memory systems promise to simplify deployment, allocation, and
+scheduling on next-generation <span id="textcolor47">WSCs</span>, but bring significant performance and
+complexity challenges. This complexity cannot be mitigated with shallow application
+changes because assumptions about system performance run deep. While caching
+attempts to avoid these challenges, we find that virtual memory paging is no
+different; the OS mechanisms implementing paging were designed in a world with
+millisecond-level access latencies and are not suitable for the microsecond access
+times offered by remote memory. The PFA allows us to make the deep changes
+needed to accommodate this new environment. By improving end-to-end
+application performance by up to 40%, the PFA enables a greater range of
+applications to run on limited local memory. However, caching is a general purpose
+approach, and applications with large working sets and poor locality will always
+suffer from increased main memory access times. To take full advantage of
+disaggregated memory, we will need a mix of interfaces, both implicit, and
+                                                                  
+
+                                                                  
+explicit.
+</p><!--l. 53--><p class="indent" >
+                                                                  
+
+                                                                  
+</p>
+    
+</body> 
+</html>
+                                                                  
+
+                                                                  
+                                                                  
+
+

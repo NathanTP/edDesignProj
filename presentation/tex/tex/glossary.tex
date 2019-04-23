@@ -1,0 +1,234 @@
+% For stuff that's both an acryonym and a glossary entry
+\newcommand*{\newdualentry}[5][]{%  
+  \newglossaryentry{main-#2}{name={#4},%  
+  text={#3\glsadd{#2}},%  
+  description={#5},%  
+  #1  
+  }%  
+  \newacronym{#2}{#3\glsadd{main-#2}}{#4}%  
+}
+
+% \glsdisablehyper
+\renewcommand*{\glstextformat}[1]{\textcolor{black}{#1}}
+
+\newdualentry{wsc}
+  {WSC}
+  {warehouse-scale computer}
+  {Generic term referring to tightly-integrated clusters of
+    machines deployed in the data center.}
+
+\newdualentry{sip}
+  {SiP}
+  {system in package}
+  {A system where all the necessary components (NIC, cpu, memory)
+   are grouped into the same physical package (but not necessarily on the same
+   chip)}
+
+\newglossaryentry{paging}
+{
+  name={paging},
+  description={The process of storing logical pages on an external storage
+device in order to free physical memory. Also called "swapping".}
+}
+
+\newdualentry{pfa}
+  {PFA}
+  {page fault accelerator}
+  {The proposed hardware-accelerator that handles page-faults for
+  remote pages automatically.}
+
+\newglossaryentry{disag}
+{
+  name={dissaggregation},
+  description={The WSC design that moves compute resources (such as memory,
+disk, and CPUs) into dedicated resource-blades that are connected through a
+high-performance network.}
+}
+
+\newdualentry{numa}
+  {NUMA}
+  {non-uniform memory access}
+  {A system where memory is cache-coherently available to multiple CPUS, but
+   with varying access latencies and bandwidths (a type of multi-socket
+   machine).}
+
+\newdualentry{rdma}
+  {RDMA}
+  {remote direct memory access}
+  {A system where memory is directly addressable between multiple
+   nodes through a network interface. RDMA systems are not typically
+   cache-coherent.}
+
+\newglossaryentry{page}
+{
+  name={page},
+  description={A fixed-size logical group of data (typically
+\SI{4}{\kibi\byte}). Sometimes called ``virtual page''.}
+}
+
+\newglossaryentry{page frame}
+{
+  name={page frame},
+  description={A fixed-size region of physical memory used to store pages.}
+}
+
+\newglossaryentry{frame}
+{
+  name={frame},
+  description={Synonym for page frame},
+  see=[Glossary:]{page frame}
+}
+
+\newglossaryentry{pgtbl}
+{
+  name={page table},
+  description={A hardware-visible tree in main memory that contains
+translations from virtual to physical addresses.}
+}
+
+\newdualentry{pte}
+  {PTE}
+  {page table entry}
+  {A single entry of the page-table. Each PTE refers to a single
+  virtual page.}
+
+\newdualentry{tlb}
+  {TLB}
+  {translation look-aside buffer}
+  {A cache of virtual to physical address translations.}
+
+\newdualentry{ptw}
+  {PTW}
+  {page table walker}
+  {A hardware device to automatically walk the page-table and
+  locate PTEs for a particular virtual address.}
+
+\newglossaryentry{bookkeeping}
+{
+  name={bookkeeping},
+  description={The internal OS-specific tasks related to bringing in a new
+page. This typically includes updating meta-data and other page-tracking
+activities.}
+}
+
+\newglossaryentry{freeq}
+{
+  name={FreeQ},
+  description={Queue of free frames to be used by the PFA to service
+page-faults.}
+}
+
+\newglossaryentry{newq}
+{
+  name={NewQ},
+  description={Queue of new-page descriptors populated by the PFA on every page
+fault and drained by the OS for bookkeeping.}
+}
+
+\newglossaryentry{evictq}
+{
+  name={EvictQ},
+  description={Queue of pages to be evicted by the PFA. Populated by the OS
+when it needs to free local physical memory.}
+}
+
+\newglossaryentry{pgid}
+{
+  name={pageID},
+  description={A unique identifier for a page in remote memory. Acts as a
+remote-memory address.}
+}
+
+\newglossaryentry{memory blade}
+{
+  name={memory blade},
+  description={A dedicated memory node in a disaggregated system. The memory blade
+exists solely to server memory requests. A memory blade may be custom-designed
+for this purpose, or may simply expose an RDMA interface.}
+}
+
+\newdualentry{mtu}
+  {MTU}
+  {maximum transfer unit}
+  {The largest contiguous packet that a network is capable of
+  transmitting.}
+
+\newdualentry{tmem}
+  {TMem}
+  {transcendent memory}
+  {A layer in the Linux paging subsystem that stores pages in
+  specialized memory that may not be disk-backed.}
+
+\newglossaryentry{cgroup}
+{
+  name={cgroup},
+  first={control group (cgroup)},
+  description={The per-task (or group of tasks) resource management system in
+the Linux kernel.}
+}
+
+\newglossaryentry{swap}
+{
+  name={swap},
+  description={Historically used to refer to the process of moving an entire
+process's memory image to disk, Linux uses ``swapping'' to refer to all
+paging.}
+  see=[Glossary:]{paging}
+}
+
+\newglossaryentry{anonpg}
+{
+  name={anonymous page},
+  description={A page that does not contain disk-backed information. This is
+primarily ``heap'' memory (e.g. memory allocated through malloc())}
+}
+
+\newdualentry{vma}
+  {VMA}
+  {virtual memory area}
+  {Contiguous region of virtual memory used by Linux to simplify memory
+   management.}
+
+\newglossaryentry{swpent}
+{
+  name={swap\_entry\_t},
+  description={A Linux-specific value stored in evicted PTEs that contains
+information on where to locate an evicted page.}
+}
+
+\newglossaryentry{kpfad}
+{
+  name={kpfad},
+  description={A background daemon that opportunistically performs bookkeeping
+  and maintenance for the PFA.}
+}
+
+\newglossaryentry{kswapd}
+{
+  name={kswapd},
+  description={A background kernel thread that opportunistically performs
+    bookkeeping.}
+}
+
+\newglossaryentry{task}
+{
+  name={task},
+  description={Linux kernel internal abstraction of a process.}
+}
+
+\newdualentry{lru}
+  {LRU}
+  {least recently used}
+  {An algorithm that attempt to pick pages that have not been used recently.}
+
+\newdualentry{nvm}
+  {NVM}
+  {non-volatile memory}
+  {Storage devices with near-DRAM performance, and byte-addressablity, that do
+  not lose their data when powered off.}
+
+\newdualentry{tco}
+  {TCO}
+  {total cost of ownership}
+  {A metric that includes not only up-front costs of a system, but the total
+  cost to own and operating that system for its effective lifespan.}

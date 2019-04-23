@@ -1,0 +1,23 @@
+So far, we have only experimented with a single client and memory blade.
+However, this does not capture all of the effects that contribute to
+performance. In particular, it would be valuable to understand congestion at
+both the memory blade, and in the network. Another effect that may surface as
+we experiment with more distributed applications is tail latency. The
+introduction of a remote page fault could increase tail latency significantly
+and would require mitigation.
+
+Another topic not addressed by the current PFA and memory blade designs is that
+of management and security. How should memory blade capacity be allocated to
+applications? How can such allocations be authenticated? Simple payload
+encryption may not be sufficient to protect applications from attackers with
+network-level access.
+
+Finally, while caching can be very effective for some workloads, it is not
+appropriate everywhere. Even within one workload, caching may be appropriate
+for some data structures, but not for others. To allow users maximum
+flexibility to choose between performance and convenience, we plan to implement
+a hybrid cache/scratchpad interface to remote memory (similar to \cite{vls}).
+In this system, application memory would default to demand paging, but certain
+portions could be pinned in specially allocated regions of local memory. The
+application would then be responsible for directly writing to and from remote
+memory.

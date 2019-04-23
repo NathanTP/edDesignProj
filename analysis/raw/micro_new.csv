@@ -1,0 +1,46 @@
+# Small, one-off measurements (all times in cycles)
+# These are all taken from the unit benchmark in pfa-exp ('unit -l')
+# N/A means the measurement isn't meaningful (or can't be measured)
+# NULL means I could get the number, but haven't yet
+# Some values are repeated, you can use those to calculate an average
+measurement,PFA,rvSW,rvRamSwap,x86RamSwap
+
+# Total time to fault and fetch a remote page once (from userspace)
+t_miss,7858,16903,20979,34164
+t_miss,7830,16814,21476,33254
+t_miss,7885,16516,20758,11916
+t_miss,7823,17079,20361,20670
+t_miss,7915,17658,20432,11752
+t_miss,7925,16822,19464,18216
+t_miss,7852,17125,20173,21520
+t_miss,7861,16960,21027,29258
+t_miss,8022,17351,20313,13104
+t_miss,7778,16821,20335,12090
+
+# Time for just the page fault. I assume this is approximately how long it takes
+# to get to the PFA as well (tlb miss + PTW)
+t_trap,45,380,466,2202
+t_trap,45,409,481,2330
+t_trap,45,419,451,2262
+t_trap,45,309,428,2254
+t_trap,45,480,427,2306
+t_trap,45,333,417,2244
+t_trap,45,362,415,2158
+t_trap,45,411,525,2158
+t_trap,45,370,432,2358
+t_trap,45,365,369,2210
+
+# Time to read one page from RMEM (raw access time)
+# Note: We can't measure this time directly for PFA, assume it's similar to rvSW
+# RamSwap were calculated from pfa_stat: (t_rmem_read / n_fetched)
+# SW memblade were calculated from the rmem unit test in kernel boot
+t_read_memblade_measured,N/A,8626,10092,2189
+t_read_memblade_measured,N/A,8636,10032,2267
+t_read_memblade_measured,N/A,8567,10028,2180
+t_read_memblade_measured,N/A,8567,10060,2129
+t_read_memblade_measured,N/A,8567,10029,2159
+t_read_memblade_measured,N/A,8693,10095,2426
+t_read_memblade_measured,N/A,8567,9983,2183
+t_read_memblade_measured,N/A,8567,10025,2131
+t_read_memblade_measured,N/A,8567,9991,2091
+t_read_memblade_measured,N/A,8567,10024,2112

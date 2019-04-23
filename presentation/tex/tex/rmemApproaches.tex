@@ -1,0 +1,96 @@
+The problem of deep and heterogeneous memory hierarchies is not entirely new;
+previous mainframe and high-performance computing platforms have previously
+exposed the concept of remote memory. I will describe some of these approaches
+in the next two sections.
+
+\subsubsection{Low-Level Interfaces}
+\paragraph{NUMA}
+\Gls{numa} architectures partition memory resources across several compute
+nodes such that memory is always local to exactly one compute resource, but
+still directly addressable by the others. In this case, all memory has the same
+interface (loads and stores from CPUs), but some is faster than others
+(non-uniform). Some \gls{numa} systems include hardware services to aid in page
+migration to mitigate this effect\cite{sgi_origin}.
+
+\Gls{numa} systems are appealing because they appear to software as a single,
+large memory. They can also offer memory access latencies on the order of 100s
+of nanoseconds. This performance and tight coupling, however, limit
+scalability. The largest NUMA systems can scale to hundreds of nodes and 10s of
+TB of memory\cite{sgiUV}, but typical systems support only a few TB and less
+than 10 nodes (due to poor scaling in cost and power).
+
+\paragraph{RDMA}
+\Gls{rdma} systems are similar to NUMA in that memory resources are partitioned
+among several compute nodes (memory is always local to
+someone)\cite{RoCE}\cite{RFC5040}. The difference is that while NUMA systems
+typically expose a cache-coherent load-store interface to both local and remote
+memory resources, \gls{rdma} uses a special put/get interface to access remote
+memory resources. Typically, this service is provided through the network
+interface and managed by software. This interface allows RDMA systems to scale
+beyond what is possible in NUMA systems, at the cost of remote memory access
+performance and a more complex interface to applications.
+
+\Gls{rdma} systems can scale to thousands of nodes and petabytes of
+memory\cite{IB_ref_design}. Performance can vary, and scales with deployment
+size, but modern Infiniband networks provide round-trip latencies of several
+microseconds (within a rack) and bandwidths of hundreds of gigabytes per
+second\cite{ib_perf}. These systems have historically been considered costly
+and were primarily deployed in supercomputing environments, but recent
+Ethernet-based implementations have made them increasingly
+accessible\cite{RoCE}.
+ 
+\paragraph{Memory Semantic Fabrics}
+Finally, a new class of interface has been recently introduced; the
+memory-semantic fabric. A memory-semantic fabric abstracts memory into a simple
+load-store interface (rather than technology-specific protocols). These
+interfaces are tightly coupled with the CPU, often loading memory directly into
+local caches or even registers. This abstraction enables heterogeneous memory
+technologies in flexible topologies. Memory thus becomes a first-class citizen
+(often called a "memory blade") on a memory-optimized interconnect. The hope is
+that such interfaces will allow for greater scalability and flexibility than
+NUMA, while providing a more direct interface than RDMA. There are several
+commercial consortia developing cache-coherent interconnects for integrating
+accelerators and memories within a rack \cite{ccix}\cite{capi}. Some academic
+projects have focused on scaling NUMA by increasing the level of abstraction
+(e.g., \cite{sonuma}\cite{lim_disag}). Finally, an industrial effort called
+Gen-Z provides a more general interface that can connect memory, accelerators,
+and storage using memory-oriented operations (like load and store)\cite{genz}.
+While Gen-Z does not include cache-coherence in the core specification, it can
+be added through custom commands between devices that require it. It remains to
+be seen how these new interconnects balance performance, scalability, and cost.
+
+\subsubsection{Software Interfaces} The low level interfaces listed above do
+not necessarily mandate a particular software interface. NUMA systems typically
+expose a virtual memory abstraction to applications. In this case, the OS
+manages mappings from virtual to physical addresses while hardware uses those
+mappings to automatically route loads and stores to the appropriate memory
+resources. The OS is also responsible for choosing which NUMA domain to
+allocate memory from. This can be a complex decision and much effort has gone
+into studying such allocation policies\cite{linux_numa}.
+
+RDMA systems are further divorced from specific hardware interfaces and enjoy a
+great diversity of interfaces. Some programming languages use a partitioned
+global address space to make it appear as if language-level variables are all
+directly accessible\cite{upc}\cite{grappa}. Other systems use RDMA more
+directly to accelerate applications such as key-value
+stores\cite{ramcloud}\cite{farm}.
+
+Memory-semantic fabrics are newer and it is not clear how their interfaces
+should be exposed. By coupling tightly with CPUs, it is possible to address
+them directly using virtual memory. However, it may be desirable to allow
+applications to choose which memory they access, or have more abstracted
+interfaces (e.g., disk-like). Furthermore, these fabrics are designed to
+support highly heterogeneous memory technologies. This has lead to
+page-migration proposals that try to manage performance and durability
+requirements either explicitly in the application, or transparently in the
+OS\cite{heteros}\cite{mojim}.
+
+In this paper, we will focus on a very general interface called demand paging
+(covered in detail in the next section) that can be implemented under any of
+the low-level interfaces listed here. We assume a system that allows block
+reads and writes to remote memory resources. In a \gls{numa} system, this would
+translate to page migration. For \gls{rdma}, we would allocate memory from
+under-utilized nodes to store pages from oversubscribed nodes (as was done in
+\cite{infiniswap}). In the memory-semantic approach, dedicated memory blades
+would be used for remote memory and transfers would be initiated directly from
+the client CPUs (e.g., using \emph{memcpy()}).
