@@ -30,8 +30,46 @@ a:hover {
     color: blue;
     border-bottom:1px dotted blue;
 }
+
+img { object-fit: contain; height: 100%; width: 100%;}
+
+/* Tabbed figures */
+.tab {
+  overflow: hidden;
+  border: 1px solid #ccc;
+  background-color: #f1f1f1;
+}
+
+/* Style the buttons that are used to open the tab content */
+.tab button {
+  background-color: inherit;
+  float: left;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  padding: 14px 16px;
+  transition: 0.3s;
+}
+
+/* Change background color of buttons on hover */
+.tab button:hover {
+  background-color: #ddd;
+}
+
+/* Create an active/current tablink class */
+.tab button.active {
+  background-color: #ccc;
+}
+
+/* Style the tab content */
+.tabcontent {
+  display: none;
+  padding: 6px 12px;
+  border: 1px solid #ccc;
+  border-top: none;
+}
  
-/* start css.sty */
+/* start css.sty (tex4ht auto-generated) */
 .cmtt-10{font-family: monospace;}
 .cmr-17{font-size:170%;}
 .cmr-12{font-size:120%;}
@@ -46,7 +84,6 @@ td p.noindent { text-indent: 0em; margin-top:0em; }
 p.nopar { text-indent: 0em; }
 p.indent{ text-indent: 1.5em }
 @media print {div.crosslinks {visibility:hidden;}}
-img { object-fit: contain; height: 100%; width: 100%;}
 a img { border-top: 0; border-left: 0; border-right: 0; }
 center { margin-top:1em; margin-bottom:1em; }
 td center { margin-top:0em; margin-bottom:0em; }
