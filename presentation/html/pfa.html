@@ -6,13 +6,14 @@
   <meta name="generator" content="TeX4ht (http://www.tug.org/tex4ht/)" /> 
   <meta name="viewport" content="width=device-width,initial-scale=1" /> 
   <link rel="stylesheet" type="text/css" href="pfa.css" /> 
-  <script src="pfa.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"> </script>
   <meta name="src" content="pfa-asplos.tex" /> 
 
   <!-- Configure and load Thebe !-->
   <script type="text/x-thebe-config">
     {
       bootstrap: true,
+			requestKernel: true,
       kernelOptions: {
         name: "python3",
         serverSettings: {
@@ -23,9 +24,8 @@
     }
   </script>
   <script type="text/javascript" src="https://unpkg.com/thebelab@^0.4.0" ></script>
-  <!-- <script type="text/javascript" src="../lib/index.js"></script> -->
-  <!-- load a local thebe: -->
-
+  <script src="pfa.js"></script>
+  <!-- <script type="text/javascript" src="thebelab/lib/index.js"></script> -->
 </head>
 
 <body>
@@ -36,6 +36,14 @@
 
 	<div class="date" ></div>
 </div>
+
+<div class="thebeAuto">
+<pre data-executable="true" data-language="python">print("Hello")</pre>
+</div>
+<div class="thebeAuto">
+<pre data-executable="true" data-language="python">print("There!")</pre>
+</div>
+
 <!-- ABSTRACT -->
 <div w3-include-html="abstract.html"></div>
 
@@ -381,8 +389,7 @@ overhead.
         <a id="x1-90022"></a>
         <!--l. 40-->
         <p class="noindent" >
-          <img 
-          src="figs/paging_overhead.png" alt="PIC"/>
+          <img src="figs/paging_overhead.png" alt="PIC"/>
           <br />
         </p>
         <!--tex4ht:label?: x1-90022 -->
@@ -410,8 +417,7 @@ overhead.
 <!--l. 46--><p class="indent" >   To demonstrate this, we modified the Linux kernel to swap to pre-allocated
 DRAM buffers in local memory instead of an external device. This effectively
 eliminates backing store access times and directly measures the overhead of using
-paging at all. Figure <a 
-href="#x1-90022">2<!--tex4ht:ref: fig:paging_overhead --></a> plots several benchmarks’ runtime as they are run under
+paging at all. Figure <a href="#x1-90022">2<!--tex4ht:ref: fig:paging_overhead --></a> plots several benchmarks’ runtime as they are run under
 increasingly memory constrained environments. Note that even without waiting for
 secondary storage, applications can slow down by as much as 12.5x due to paging
 overheads.
@@ -824,23 +830,95 @@ stack.
 </p>
 
 
-
+<!-- #Section 5: Results -->
 <h3 class="sectionHead">
     <span class="titlemark">5   </span>
     <a id="x1-240005"></a>
     Evaluation
 </h3>
-<!--l. 1--><p class="noindent" >
-</p>
-   <h4 class="subsectionHead"><span class="titlemark">5.1   </span> <a 
- id="x1-250005.1"></a>Experimental Design</h4>
-<!--l. 2--><p class="noindent" >Our evaluation is based on two benchmarks with significantly different access
+<!--l. 1-->
+<p class="noindent" > </p>
+
+<div class="content" style="display: none;">
+	<div class="thebeAuto">
+		<pre id="pythonInit" data-executable="true" data-language="python">
+import pandas as pd
+import numpy as np
+import matplotlib
+import matplotlib.pyplot as plt
+import matplotlib.font_manager as font_manager
+import math
+
+#=====================
+# Matplotlib settings
+#=====================
+# Color style similar to ppt color scheme
+plt.style.use('seaborn-colorblind')
+
+#Latex Default Font
+plt.rc('font', family='serif') 
+plt.rc('font', serif='Latin Modern Roman')
+matplotlib.rcParams.update({'font.size': 16})
+
+%matplotlib inline
+%config InlineBackend.figure_format = 'retina'
+
+#============================================
+# Full Experiment Results Loading/Cleaning
+#============================================
+res = pd.read_csv("raw/q64.csv", header=0, comment='#')
+
+# Times from cycles to micro seconds
+res['RunTime'] = res['RunTime'] / 3.2E9
+res['t_bookkeeping'] = res['t_bookkeeping'] / 3.2E9
+res['t_rmem_write'] = res['t_rmem_write'] / 3.2E9
+res['t_rmem_read'] = res['t_rmem_read'] / 3.2E9
+res['t_fault'] = res['t_fault'] / 3.2E9
+res['t_kpfad'] = res['t_kpfad'] / 3.2E9
+
+# Size from absolute to "%local"
+res['MemSize'] = (res['MemSize'] / 64000000)*100
+
+# Split by benchmark
+gen_pfa_res    = res.loc[res['Config'] == "pfa64_real"   ].loc[res['Benchmark'] == "Genome"].set_index('MemSize')
+gen_sw_res = res.loc[res['Config'] == "sw_real"].loc[res['Benchmark'] == "Genome"].set_index('MemSize')
+
+qsort_pfa_res = res.loc[res['Config'] == "pfa64_real"].loc[res['Benchmark'] == "Qsort"].set_index('MemSize')
+qsort_sw_res = res.loc[res['Config'] == "sw_real"].loc[res['Benchmark'] == "Qsort"].set_index('MemSize')
+
+# Normalize to the 100% case (Runtime now a "Slowdown")
+def NormalizeRuntime(r):
+		r['Slowdown'] = r['RunTime'] / r['RunTime'].loc[100]
+		return r.drop(100)
+
+gen_pfa_res =      NormalizeRuntime(gen_pfa_res)
+gen_sw_res =   NormalizeRuntime(gen_sw_res)
+qsort_pfa_res =    NormalizeRuntime(qsort_pfa_res)
+qsort_sw_res = NormalizeRuntime(qsort_sw_res)
+
+# Micro Benchmarks
+micro = pd.read_csv("raw/micro.csv", header=0, comment='#')
+# Convert cycles to seconds
+micro['PFA'] = micro['PFA'] / 3.2
+micro['SW'] = micro['SW'] / 3.2
+micro_mean = micro.groupby('measurement').mean()
+micro_std = micro.groupby('measurement').std()
+print("Results Initialized")
+		</pre>
+	</div>
+</div>
+
+<h4 class="subsectionHead">
+  <span class="titlemark">5.1   </span> 
+  <a id="x1-250005.1"></a>
+  Experimental Design
+</h4>
+
+<!--l. 2-->
+<p class="noindent" >Our evaluation is based on two benchmarks with significantly different access
 patterns. The first is quicksort (Qsort). This benchmark first allocates a large array
 of random numbers, and then sorts it using the well-known quicksort algorithm.
 Quicksort is a divide and conquer algorithm that automatically partitions the input
-                                                                  
-
-                                                                  
 array into small local blocks before performing a final sort. This leads to excellent
 cache behavior and predictable access patterns. Furthermore, by allocating the input
 array dynamically, quicksort performs no file I/O, so it is never blocked on I/O or
@@ -853,275 +931,11 @@ representing a genome. This is done by loading contigs into a large hash table
 and probing into it repeatedly to find matching sequences. This leads to
 very little locality and unpredictable access patterns. Furthermore, Gen
 performs file I/O on the input, which allows for more complex OS interactions.
-<br 
-class="newline" /><br 
-class="newline" /></p><!--l. 23-->
-   <div class="lstlisting" id="listing-1"><span class="label"><a 
- id="x1-25001r1"></a></span><span 
-class="cmtt-10">#</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">Data</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">Schema</span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-25002r2"></a></span><span 
-class="cmtt-10">result</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">=</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">NamedTuple</span><span 
-class="cmtt-10">(</span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-25003r3"></a></span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">’</span><span 
-class="cmtt-10">mean</span><span 
-class="cmtt-10">’,</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">#</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">Mean</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">results</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">from</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">10</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">runs</span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-25004r4"></a></span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">’</span><span 
-class="cmtt-10">std</span><span 
-class="cmtt-10">’,</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">#</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">Standard</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">deviation</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">from</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">10</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">runs</span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-25005r5"></a></span><span 
-class="cmtt-10">)</span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-25006r6"></a></span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-25007r7"></a></span><span 
-class="cmtt-10">#</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">mean</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">and</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">std</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">have</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">the</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">same</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">set</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">of</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">keys</span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-25008r8"></a></span><span 
-class="cmtt-10">result</span><span 
-class="cmtt-10">.</span><span 
-class="cmtt-10">mean</span><span 
-class="cmtt-10">.</span><span 
-class="cmtt-10">keys</span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-25009r9"></a></span><span 
-class="cmtt-10">[</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">’</span><span 
-class="cmtt-10">t_run</span><span 
-class="cmtt-10">’,</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">’</span><span 
-class="cmtt-10">t_bookkeeping</span><span 
-class="cmtt-10">’,</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">’</span><span 
-class="cmtt-10">t_rmem_write</span><span 
-class="cmtt-10">’,</span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-25010r10"></a></span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">’</span><span 
-class="cmtt-10">t_rmem_read</span><span 
-class="cmtt-10">’,</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">’</span><span 
-class="cmtt-10">n_fault</span><span 
-class="cmtt-10">’,</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">’</span><span 
-class="cmtt-10">t_fault</span><span 
-class="cmtt-10">’,</span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-25011r11"></a></span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">’</span><span 
-class="cmtt-10">n_swapfault</span><span 
-class="cmtt-10">’,</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">’</span><span 
-class="cmtt-10">n_pfa_fault</span><span 
-class="cmtt-10">’,</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">’</span><span 
-class="cmtt-10">n_early_newq</span><span 
-class="cmtt-10">’,</span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-25012r12"></a></span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">’</span><span 
-class="cmtt-10">n_evicted</span><span 
-class="cmtt-10">’,</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">’</span><span 
-class="cmtt-10">n_fetched</span><span 
-class="cmtt-10">’,</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">’</span><span 
-class="cmtt-10">n_kpfad</span><span 
-class="cmtt-10">’,</span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-25013r13"></a></span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">’</span><span 
-class="cmtt-10">t_kpfad</span><span 
-class="cmtt-10">’,</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">’</span><span 
-class="cmtt-10">slowdown</span><span 
-class="cmtt-10">’]</span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-25014r14"></a></span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-25015r15"></a></span><span 
-class="cmtt-10">#</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">Datasets</span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-25016r16"></a></span><span 
-class="cmtt-10">#</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">Paging</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">to</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">remote</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">memory</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">in</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">SW</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">(’</span><span 
-class="cmtt-10">baseline</span><span 
-class="cmtt-10">’)</span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-25017r17"></a></span><span 
-class="cmtt-10">base_res</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">=</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">ingest_run</span><span 
-class="cmtt-10">(’</span><span 
-class="cmtt-10">raw</span><span 
-class="cmtt-10">/</span><span 
-class="cmtt-10">results_baseline</span><span 
-class="cmtt-10">.</span><span 
-class="cmtt-10">csv</span><span 
-class="cmtt-10">’,</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">’</span><span 
-class="cmtt-10">rv</span><span 
-class="cmtt-10">’)</span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-25018r18"></a></span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-25019r19"></a></span><span 
-class="cmtt-10">#</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">Paging</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">using</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">the</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">PFA</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">to</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">real</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">memblade</span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-25020r20"></a></span><span 
-class="cmtt-10">pfa_res</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">=</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">ingest_run</span><span 
-class="cmtt-10">(’</span><span 
-class="cmtt-10">raw</span><span 
-class="cmtt-10">/</span><span 
-class="cmtt-10">results_pfa</span><span 
-class="cmtt-10">.</span><span 
-class="cmtt-10">csv</span><span 
-class="cmtt-10">’,</span><span 
-class="cmtt-10"> </span><span 
-class="cmtt-10">’</span><span 
-class="cmtt-10">rv</span><span 
-class="cmtt-10">’)</span>
-   
-   </div>
-<!--l. 47--><p class="noindent" >
+<br class="newline" /><br class="newline" /></p>
+<!--l. 23-->
+
+<!--l. 47-->
+<p class="noindent" >
 </p>
    <h4 class="subsectionHead"><span class="titlemark">5.2   </span> <a 
  id="x1-260005.2"></a>End-to-End Performance</h4>
@@ -1215,7 +1029,56 @@ of paging. For both benchmarks, the PFA reduces end to end run time by up to
   </div>
 
   <div id="fig9User" class="tabcontent">
-    <p>Nothing here yet</p>
+
+<div class="thebeAuto">
+	<pre data-executable="true" data-language="python">
+import ipywidgets as widgets
+from IPython.display import display
+genEnable = widgets.Checkbox(
+    value=False,
+    description='Genome',
+    disabled=False
+)
+display(genEnable)
+qsortEnable = widgets.Checkbox(
+    value=False,
+    description='QSort',
+    disabled=False
+)
+display(qsortEnable)
+	</pre>
+</div>
+
+<pre data-executable="true" data-language="python">
+
+total_slowdown = pd.DataFrame()
+if genEnable.value:
+	total_slowdown = pd.concat([total_slowdown,
+														gen_pfa_res['Slowdown'].rename("Genome PFA"),
+                            gen_sw_res['Slowdown'].rename("Genome SW")],
+														axis=1)
+
+if qsortEnable.value:
+	total_slowdown = pd.concat([total_slowdown,
+															qsort_pfa_res['Slowdown'].rename("Qsort PFA"),
+															qsort_sw_res['Slowdown'].rename("Qsort SW")],
+														axis=1)
+
+ax = total_slowdown.plot(
+    kind='bar',
+    legend=False,
+    width=0.8)
+ax.set_ylabel('Slowdown vs No Paging')
+ax.set_xlabel('Percent Memory Local')
+
+hatches = ['//', '//', '//', 2*'x', 2*'x', 2*'x', '--', '--', '--','||','||','||']
+for i,bar in enumerate(ax.patches):
+    bar.set_hatch(hatches[i])
+    
+ax.legend()    
+
+plt.show()
+</pre>
   </div>
 
   <div id="fig9Raw" class="tabcontent">

@@ -1,0 +1,66 @@
+# Small, one-off measurements (all times in cycles)
+# N/A means the measurement isn't meaningful (or can't be measured)
+# NULL means I could get the number, but haven't yet
+# Some values are repeated, you can use those to calculate an average
+measurement,PFA,SW
+
+# Total time to fault and fetch a remote page once (from userspace)
+t_miss,14216,30547
+t_miss,14157,31663
+t_miss,14157,31645
+t_miss,14216,31579
+t_miss,14216,30424
+t_miss,14217,32295
+t_miss,14216,31799
+t_miss,14187,31199
+t_miss,14157,31152
+t_miss,14216,30759
+
+# Time for just the page fault. I assume this is approximately how long it takes
+# to get to the PFA as well (tlb miss + PTW)
+t_trap,300,300
+t_trap,457,457
+t_trap,358,358
+t_trap,306,306
+t_trap,407,407
+t_trap,362,362
+t_trap,391,391
+t_trap,423,423
+t_trap,300,300
+t_trap,348,348
+t_trap,340,340
+
+# Time for just the processing of the page (t_miss - t_trap)
+# This number is different from t_bookkeeping because it includes all page-fault software
+t_fetch,N/A,29962
+t_fetch,N/A,31413
+t_fetch,N/A,31413
+t_fetch,N/A,30577
+t_fetch,N/A,30890
+t_fetch,N/A,30990
+t_fetch,N/A,30773
+t_fetch,N/A,30451
+t_fetch,N/A,30686
+t_fetch,N/A,30726
+t_fetch,N/A,30744
+
+# Time to read one page from RMEM (raw access time) from the switch-based memory blade
+t_read_switch_memblade_measured,N/A,15504
+t_read_switch_memblade_measured,N/A,15593
+t_read_switch_memblade_measured,N/A,15499
+t_read_switch_memblade_measured,N/A,15453
+t_read_switch_memblade_measured,N/A,15303
+t_read_switch_memblade_measured,N/A,15176
+t_read_switch_memblade_measured,N/A,15393
+t_read_switch_memblade_measured,N/A,15680
+t_read_switch_memblade_measured,N/A,15219
+t_read_switch_memblade_measured,N/A,15276
+t_read_switch_memblade_measured,N/A,15377
+
+
+# Theoretical time on wire for a memblade access (based on FireSim config)
+# This - *_measured should be ~= NIC overhead
+t_read_switch_memblade_theory,13083,13083
+
+# Time to read one page from RMEM (raw access time) from the real memory blade
+t_read_real,NULL,NULL

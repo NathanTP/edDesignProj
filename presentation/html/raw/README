@@ -1,0 +1,10 @@
+General Description: PFA queues were sized at 64 entries
+Date: Nov 18 ~11pm
+AGFI: agfi-0bac3dd01a3ce6784
+firesim-software: 3dd21c94bb746935531d930afe3c11eb956ba34c
+Switch: ???
+
+Configs:
+PFA: PFA talking with switch-based memory blade
+SWFast: RSwap+timer emulation. Read: 8243ns, Write: 0ns
+SWSlow: RSwap+timer emulation. Read: 31054ns, Write: 0ns
