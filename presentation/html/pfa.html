@@ -1134,7 +1134,7 @@ is able to continue processing. In this experiment, we use a simplified memory
 blade and network implementation with a constant 4 <span 
 class="tcrm-1000">µ</span>s access latency in
 order to better understand local overheads. Figure <a 
-href="#x1-2800211">11<!--tex4ht:ref: fig:fetch_breakdown --></a> plots the time for
+href="#x1-2800211">10<!--tex4ht:ref: fig:fetch_breakdown --></a> plots the time for
 accessing a single remote page on an unloaded system. We classify time into four
 categories:
 </p>
@@ -1276,59 +1276,30 @@ and memory blade performance improves. For example, if <span
 class="cmbx-10">MemBlade </span>time
 were reduced to 1129 ns to simulate a 1 Tbit/s link with 1 <span 
 class="tcrm-1000">µ</span>s round-trip
-latency (as predicted in Section <span 
-class="cmbx-10">??</span> for photonic networks), then client-side
+latency (as predicted for photonic networks), then client-side
 processing would account for 83% of time in SW but only 23% of time with
-the PFA. Finally, note that the <span 
+the PFA (see the 'user' tab of figure 10 to experiment with this). Finally, note that the <span 
 class="cmbx-10">NIC </span>time in software is larger than the
 total time in the PFA. We believe this is due to a more efficient hardware to
 hardware interface between the PFA and the NIC. While not visible in the
 figure, the actual PFA-specific processing takes only 1 cycle in hardware,
 the remaining time is split between detecting and delivering the remote
-PTE to the PFA (<span 
-class="cmbx-10">Trap</span>), and interacting with the NIC (<span 
-class="cmbx-10">NIC</span>). The total
-time to fetch a page with the PFA is 2.2 times faster than in SW, but this
-does not tell the whole story; The PFA does not eliminate the work that is
-done during SW <span 
-class="cmbx-10">Proc</span>, it simply moves it to another thread. Likewise, the
-113 ns trap overhead may seem small, but this does not account for the
+PTE to the PFA (<span class="cmbx-10">Trap</span>), and interacting with the
+NIC (<span class="cmbx-10">NIC</span>). The total time to fetch a page with the
+PFA is 2.2 times faster than in SW, but this does not tell the whole story; The
+PFA does not eliminate the work that is done during SW <span class="cmbx-10">Proc</span>, 
+it simply moves it to another thread. Likewise,
+the 113 ns trap overhead may seem small, but this does not account for the
 effect that cache pollution from the handler has on the application when it
 restarts.
 </p>
-
-<!-- #Figure 11 -->
-<hr class="figure" />
-  <div class="figure">
-    <a id="x1-2800211"></a>
-    <!--l. 136-->
-    <p class="noindent" >
-      <img src="figs/fetch_breakdown_fastmem.png" alt="PIC"/>
-      <br />
-    </p>
-    <div class="caption">
-      <span class="id">Figure 11:</span>
-      <span class="content">Breakdown  of  time  in  fetching  a  single  remote  page  from  a
-      hypothetical fast memory blade with 1 <span 
-      class="tcrm-1000">µ</span>s page read latency. As network and
-      memory technology improves, the relative benefit of the PFA increases (from
-      2.2x faster with the baseline memory blade to 4.6x faster with the optimistic
-      memory blade).</span>
-    </div>
-    <!--tex4ht:label?: x1-2800211 -->
-  </div>
-<hr class="endfigure" />
-
-
 
 <!--l. 145--><p class="noindent" ><span class="paragraphHead"><a 
  id="x1-290005.2.1"></a><span 
 class="cmbx-10">Total Page Faults</span></span>
    One key function of the PFA is to reduce the number of page faults due to paging.
-Recall from Section <span 
-class="cmbx-10">??</span> that there are many causes for faults (e.g., to perform
-copy-on-write), in Figure <a 
-href="#x1-2900112">12<!--tex4ht:ref: fig:pfa_swapfault --></a> I plot the number of paging-related faults each
+There are many causes for faults (e.g., to perform copy-on-write), in Figure <a 
+href="#x1-2900112">12<!--tex4ht:ref: fig:pfa_swapfault --></a> we plot the number of paging-related faults each
 benchmark experiences as a fraction of total faults. The first thing to note is
 that the number paging-related faults decreases by approximately 64 when
 the PFA is used. This is because the PFA interrupts the OS to perform
@@ -1340,96 +1311,324 @@ there are certainly some savings due to fewer kernel crossings, they are not
 frequent nor long enough to explain all the performance benefits we see
 end-to-end.
 </p>
-
+odataEnableMask = [genEnable.value, genEnable.value, qsortEnable.value, qsortEnable.value]
+memEnableMask = [largeMemEnable.value, midMemEnable.value, smallMemEnable.value]
+dataEnableMask = [genEnable.value, genEnable.value, qsortEnable.value, qsortEnable.value]
+memEnableMask = [largeMemEnable.value, midMemEnable.value, smallMemEnable.value]
+ataEnableMask = [genEnable.value, genEnable.value, qsortEnable.value, qsortEnable.value]
+memEnableMask = [largeMemEnable.value, midMemEnable.value, smallMemEnable.value]
 
 <!-- #Figure 12 -->
-<hr class="figure" />
-  <div class="figure">
-    <a id="x1-2900112"></a>
-    <!--l. 162-->
-    <p class="noindent" >
-      <img src="figs/swapfault.png" alt="PIC" />
-      <br />
-    </p>
-    <div class="caption">
-      <span class="id">Figure 12:</span>
-      <span class="content">Number  of  paging-related  faults  as  a  fraction  of  total  faults
-      experienced.</span>
-    </div>
-    <!--tex4ht:label?: x1-2900112 -->
+<div class="tabbedFigure" id="fig12">
+  <div class="tab">
+    <button class="tablinks" onclick="openFig(event, 'fig12', 'fig12Def')" id="fig12defTab">Default</button>
+    <button class="tablinks" onclick="openFig(event, 'fig12', 'fig12User')">User</button>
+    <button class="tablinks" onclick="openFig(event, 'fig12', 'fig12Raw')">Raw</button>
   </div>
-<hr class="endfigure" />
 
+  <div id="fig12Def" class="tabcontent">
+    <hr class="figure" />
+      <div class="figure">
+        <a id="x1-260129"></a>
+        <!--l. 66-->
+        <p class="noindent" >
+          <img src="figs/swapfault.png" alt="PIC" />
+          <br />
+        </p>
+      </div>
+    <hr class="endfigure" />
+  </div>
 
+  <div id="fig12User" class="tabcontent">
 
-<!--l. 168--><p class="noindent" ><span class="paragraphHead"><a 
- id="x1-300005.2.1"></a><span 
-class="cmbx-10">Bookkeeping Time</span></span>
-   While we do reduce the number of paging-related faults, the kernel still needs to
-perform bookkeeping on the same number of pages. This batching means that more
-work is performed per page fault with the PFA. Figure <a 
-href="#x1-3000113">13<!--tex4ht:ref: fig:pfa_bk_prop --></a> shows total time spent
-bookkeeping, regardless of the number of page faults. What we see is that while the
-number of evicted pages is the same in both configurations, using the PFA leads to a
-2.5x reduction in bookkeeping time on average. The same code path is executed for
-each new page, but the PFA batches these events, leading to improved cache
-locality for the OS, and fewer cache-polluting page-faults for the application.
-The result is that, even in the worst case, the PFA spends less than half
-its time handling paging-related faults, while the baseline spends about
-80%.
+    <div class="thebeAuto">
+      <pre data-executable="true" data-language="python">
+# Dataset Selection
+genEnable = widgets.Checkbox(description='Genome', value=True)
+qsortEnable = widgets.Checkbox(description='QSort', value=True)
+
+# MemSize Selection
+largeMemEnable = widgets.Checkbox(description='75%', value=True)
+midMemEnable = widgets.Checkbox(description='50%', value=True)
+smallMemEnable = widgets.Checkbox(description='25%', value=True)
+
+leftBox = widgets.VBox([genEnable, qsortEnable])
+rightBox = widgets.VBox([largeMemEnable, midMemEnable, smallMemEnable])
+widgets.HBox([leftBox, rightBox])
+      </pre>
+    </div>
+
+    <pre data-executable="true" data-language="python">
+swap_fault_frac = pd.concat([
+    (gen_sw_res['n_swapfault'] / gen_sw_res['n_fault']).rename("Genome SW"),
+    (gen_pfa_res['n_pfa_fault'] / gen_pfa_res['n_fault']).rename("Genome PFA"),
+    (qsort_sw_res['n_swapfault'] / qsort_sw_res['n_fault']).rename("Qsort SW"),
+    (qsort_pfa_res['n_pfa_fault'] / qsort_pfa_res['n_fault']).rename("Qsort PFA")],
+    axis=1)
+
+dataEnableMask = [genEnable.value, genEnable.value, qsortEnable.value, qsortEnable.value]
+memEnableMask = [largeMemEnable.value, midMemEnable.value, smallMemEnable.value]
+ax = (swap_fault_frac * 100).loc[memEnableMask, dataEnableMask].plot(kind='bar', legend=False)
+hatches = ['//', '//', '//', 2*'x', 2*'x', 2*'x', '--', '--', '--','||','||','||']
+for i,bar in enumerate(ax.patches):
+    bar.set_hatch(hatches[i])
+
+ax.legend(fontsize=12)
+ax.set_ylabel('Percent Paging-Related')
+ax.set_xlabel('Percent Memory Local')
+plt.show()
+    </pre>
+  </div>
+
+  <div id="fig12Raw" class="tabcontent">
+    <pre data-executable="true" data-language="python">
+swap_fault_frac = pd.concat([
+    (gen_sw_res['n_swapfault'] / gen_sw_res['n_fault']).rename("Genome SW"),
+    (gen_pfa_res['n_pfa_fault'] / gen_pfa_res['n_fault']).rename("Genome PFA"),
+    (qsort_sw_res['n_swapfault'] / qsort_sw_res['n_fault']).rename("Qsort SW"),
+    (qsort_pfa_res['n_pfa_fault'] / qsort_pfa_res['n_fault']).rename("Qsort PFA")],
+    axis=1)
+
+# Use this space to explore the data
+swap_fault_frac
+    </pre>
+  </div>
+
+	<div class="caption">
+		<span class="id">Figure 12:</span>
+		<span class="content">Number  of  paging-related  faults  as  a  fraction  of  total  faults
+		experienced.</span>
+	</div>
+	<!--tex4ht:label?: x1-2900112 -->
+
+  <script>document.getElementById("fig12defTab").click();</script>
+</div>
+
+<!--l. 168-->
+<p class="noindent" >
+	<span class="paragraphHead">
+		<a id="x1-300005.2.1"></a>
+		<span class="cmbx-10">Bookkeeping Time</span>
+	</span>
+	While we do reduce the number of paging-related faults, the kernel still needs to
+	perform bookkeeping on the same number of pages. This batching means that more
+	work is performed per page fault with the PFA. Figure <a 
+	href="#x1-3000113">13<!--tex4ht:ref: fig:pfa_bk_prop --></a> shows total time spent
+	bookkeeping, regardless of the number of page faults. What we see is that while the
+	number of evicted pages is the same in both configurations, using the PFA leads to a
+	2.5x reduction in bookkeeping time on average. The same code path is executed for
+	each new page, but the PFA batches these events, leading to improved cache
+	locality for the OS, and fewer cache-polluting page-faults for the application.
+	The result is that, even in the worst case, the PFA spends less than half
+	its time handling paging-related faults, while the baseline spends about
+	80%.
 </p>
-
 
 <!-- #Figure 13 -->
-<hr class="figure" />
-  <div class="figure">
-    <a id="x1-3000113"></a>
-    <!--l. 182-->
-    <p class="noindent">
-      <img src="figs/bk_prop_all.png" alt="PIC" />
-      <br />
-    </p>
-    <div class="caption"> 
-      <span class="id">Figure 13:</span> <span class="content">Proportion of Time Spent Bookkeeping</span>
-    </div>
-    <!--tex4ht:label?: x1-3000113 -->
+<div class="tabbedFigure" id="fig13">
+  <div class="tab">
+    <button class="tablinks" onclick="openFig(event, 'fig13', 'fig13Def')" id="fig13defTab">Default</button>
+    <button class="tablinks" onclick="openFig(event, 'fig13', 'fig13User')">User</button>
+    <button class="tablinks" onclick="openFig(event, 'fig13', 'fig13Raw')">Raw</button>
   </div>
-<hr class="endfigure" />
 
-<!--l. 187--><p class="noindent" ><span class="paragraphHead"><a 
- id="x1-310005.2.1"></a><span 
-class="cmbx-10">Scaling</span></span>
-   Figure <a 
-href="#x1-3100114">14<!--tex4ht:ref: fig:pfa_total_speedup --></a> shows the improvement in end-to-end runtime due to the PFA on our
-applications. While the improvement is significant (up to 40%), the savings are
-constant (there is no asymptotic improvement). This is because the PFA does not
-change any of the caching algorithms, and therefor experiences the same number of
-faults. This means that applications (such as Gen) that are not particularly
-cache-friendly can see significant slowdowns in a disaggregated environment, even
-with the PFA. Ultimately, the PFA pushes the boundaries of what is possible with
-cache-like interfaces, but it cannot change their fundamental limitations.
-Applications like Gen will need deeper changes to be viable on a disaggregated
-system.
+  <div id="fig13Def" class="tabcontent">
+    <hr class="figure" />
+      <div class="figure">
+        <a id="x1-260129"></a>
+        <!--l. 66-->
+        <p class="noindent" >
+					<img src="figs/bk_prop_all.png" alt="PIC" />
+          <br />
+        </p>
+      </div>
+    <hr class="endfigure" />
+  </div>
+
+  <div id="fig13User" class="tabcontent">
+
+    <div class="thebeAuto">
+      <pre data-executable="true" data-language="python">
+# Dataset Selection
+genEnable = widgets.Checkbox(description='Genome', value=True)
+qsortEnable = widgets.Checkbox(description='QSort', value=True)
+
+# MemSize Selection
+largeMemEnable = widgets.Checkbox(description='75%', value=True)
+midMemEnable = widgets.Checkbox(description='50%', value=True)
+smallMemEnable = widgets.Checkbox(description='25%', value=True)
+
+leftBox = widgets.VBox([genEnable, qsortEnable])
+rightBox = widgets.VBox([largeMemEnable, midMemEnable, smallMemEnable])
+widgets.HBox([leftBox, rightBox])
+      </pre>
+    </div>
+
+    <pre data-executable="true" data-language="python">
+dataEnableMask = [genEnable.value, genEnable.value, qsortEnable.value, qsortEnable.value]
+memEnableMask = [largeMemEnable.value, midMemEnable.value, smallMemEnable.value]
+
+def NormalizeBK(r):
+    r['bk_prop'] = r['t_bookkeeping'] / r['RunTime']
+    return r
+
+# Calculate the proportion of time spent in bookkeeping (bk_prop)
+gen_pfa_res =      NormalizeBK(gen_pfa_res)
+gen_sw_res =   NormalizeBK(gen_sw_res)
+qsort_pfa_res =    NormalizeBK(qsort_pfa_res)
+qsort_sw_res = NormalizeBK(qsort_sw_res)
+
+gen_bk_prop = pd.concat([gen_pfa_res['bk_prop'].rename('Gen PFA'), gen_sw_res['bk_prop'].rename("Gen SW")], axis=1)
+qsort_bk_prop = pd.concat([qsort_pfa_res['bk_prop'].rename('Qsort PFA'), qsort_sw_res['bk_prop'].rename("Qsort SW")], axis=1)
+
+# Scale to percent instead of fraction
+toPlot = pd.concat([gen_bk_prop, qsort_bk_prop], axis=1) * 100
+# filter based on user preferences
+toPlot = toPlot.loc[memEnableMask, dataEnableMask]
+# plot
+ax = toPlot.plot(
+				kind="bar",
+				width=0.8,
+				legend=False,
+				ylim=(0, 100)
+			)
+
+hatches = ['//', '//', '//', 2*'x', 2*'x', 2*'x', '--', '--', '--','||','||','||']
+for i,bar in enumerate(ax.patches):
+    bar.set_hatch(hatches[i])
+    
+ax.set_ylabel('Percent Time Spent Bookkeeping')
+ax.set_xlabel('Percent Memory Local')
+plt.legend()
+plt.show()
+    </pre>
+  </div>
+
+  <div id="fig13Raw" class="tabcontent">
+    <pre data-executable="true" data-language="python">
+def NormalizeBK(r):
+    r['bk_prop'] = r['t_bookkeeping'] / r['RunTime']
+    return r
+
+# Calculate the proportion of time spent in bookkeeping (bk_prop)
+gen_pfa_res =      NormalizeBK(gen_pfa_res)
+gen_sw_res =   NormalizeBK(gen_sw_res)
+qsort_pfa_res =    NormalizeBK(qsort_pfa_res)
+qsort_sw_res = NormalizeBK(qsort_sw_res)
+
+gen_bk_prop = pd.concat([gen_pfa_res['bk_prop'].rename('Gen PFA'), gen_sw_res['bk_prop'].rename("Gen SW")], axis=1)
+qsort_bk_prop = pd.concat([qsort_pfa_res['bk_prop'].rename('Qsort PFA'), qsort_sw_res['bk_prop'].rename("Qsort SW")], axis=1)
+
+# Use this space to explore the data
+    </pre>
+  </div>
+
+	<div class="caption"> 
+		<span class="id">Figure 13:</span> <span class="content">Proportion of Time Spent Bookkeeping</span>
+	</div>
+	<!--tex4ht:label?: x1-3000113 -->
+
+  <script>document.getElementById("fig13defTab").click();</script>
+</div>
+
+<!--l. 187-->
+<p class="noindent" >
+	<span class="paragraphHead">
+		<a id="x1-310005.2.1"></a>
+		<span class="cmbx-10">Scaling</span>
+	</span>
+	Figure <a href="#x1-3100114">14<!--tex4ht:ref: fig:pfa_total_speedup --></a>
+	shows the improvement in end-to-end runtime due to the PFA on our
+	applications. While the improvement is significant (up to 40%), the savings are
+	constant (there is no asymptotic improvement). This is because the PFA does not
+	change any of the caching algorithms, and therefor experiences the same number of
+	faults. This means that applications (such as Gen) that are not particularly
+	cache-friendly can see significant slowdowns in a disaggregated environment, even
+	with the PFA. Ultimately, the PFA pushes the boundaries of what is possible with
+	cache-like interfaces, but it cannot change their fundamental limitations.
+	Applications like Gen will need deeper changes to be viable on a disaggregated
+	system.
 </p>
 
-
 <!-- #Figure 14 -->
-<hr class="figure" />
-  <div class="figure">
-    <a id="x1-3100114"></a>
-    <!--l. 200-->
-    <p class="noindent" >
-      <img src="figs/total_speedup.png" alt="PIC" />
-      <br />
-    </p>
-    <div class="caption">
-      <span class="id">Figure 14: </span>
-      <span class="content">Total runtime improvement due to PFA</span>
-    </div><!--tex4ht:label?: x1-3100114 -->
+<div class="tabbedFigure" id="fig14">
+  <div class="tab">
+    <button class="tablinks" onclick="openFig(event, 'fig14', 'fig14Def')" id="fig14defTab">Default</button>
+    <button class="tablinks" onclick="openFig(event, 'fig14', 'fig14User')">User</button>
+    <button class="tablinks" onclick="openFig(event, 'fig14', 'fig14Raw')">Raw</button>
   </div>
-<hr class="endfigure" />
 
+  <div id="fig14Def" class="tabcontent">
+    <hr class="figure" />
+      <div class="figure">
+        <a id="x1-260129"></a>
+        <!--l. 66-->
+        <p class="noindent" >
+					<img src="figs/total_speedup.png" alt="PIC" />
+          <br />
+        </p>
+      </div>
+    <hr class="endfigure" />
+  </div>
 
+  <div id="fig14User" class="tabcontent">
+
+    <div class="thebeAuto">
+      <pre data-executable="true" data-language="python">
+# Dataset Selection
+genEnable = widgets.Checkbox(description='Genome', value=True)
+qsortEnable = widgets.Checkbox(description='QSort', value=True)
+
+# MemSize Selection
+largeMemEnable = widgets.Checkbox(description='75%', value=True)
+midMemEnable = widgets.Checkbox(description='50%', value=True)
+smallMemEnable = widgets.Checkbox(description='25%', value=True)
+
+leftBox = widgets.VBox([genEnable, qsortEnable])
+rightBox = widgets.VBox([largeMemEnable, midMemEnable, smallMemEnable])
+widgets.HBox([leftBox, rightBox])
+      </pre>
+    </div>
+
+    <pre data-executable="true" data-language="python">
+dataEnableMask = [genEnable.value, qsortEnable.value]
+memEnableMask = [largeMemEnable.value, midMemEnable.value, smallMemEnable.value]
+
+# Ratio of PFA runtime vs SW
+relative_speed = pd.concat([(gen_sw_res['RunTime'] / gen_pfa_res['RunTime']).rename("gen"),
+                            (qsort_sw_res['RunTime'] / qsort_pfa_res['RunTime']).rename("qsort")], axis=1)
+
+ax = relative_speed.loc[memEnableMask, dataEnableMask].plot(
+    kind='bar')
+
+hatches = ['//', '//', '//', 'x', 'x', 'x']
+for i,bar in enumerate(ax.patches):
+    bar.set_hatch(hatches[i])
+    
+ax.legend(bbox_to_anchor=(1, 1), loc=2)
+plt.ylabel('PFA Speedup')
+plt.xlabel('Percent Memory Local')
+plt.show()
+    </pre>
+  </div>
+
+  <div id="fig14Raw" class="tabcontent">
+    <pre data-executable="true" data-language="python">
+# Ratio of PFA runtime vs SW
+relative_speed = pd.concat([(gen_sw_res['RunTime'] / gen_pfa_res['RunTime']).rename("gen"),
+                            (qsort_sw_res['RunTime'] / qsort_pfa_res['RunTime']).rename("qsort")], axis=1)
+
+# Use this space to explore the data
+    </pre>
+  </div>
+
+	<div class="caption">
+		<span class="id">Figure 14: </span>
+		<span class="content">Total runtime improvement due to PFA</span>
+	</div><!--tex4ht:label?: x1-3100114 -->
+
+  <script>document.getElementById("fig14defTab").click();</script>
+</div>
 
 <!-- #Section 6: Future Work -->
 <h3 class="sectionHead">
