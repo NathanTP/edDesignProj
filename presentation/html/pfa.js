@@ -40,18 +40,6 @@ function openFig(evt, contID, figID) {
   evt.currentTarget.className += " active";
 }
 
-// Collapsible
-function clickCollapsible(id) {
-	var elm = document.getElementById(id);
-	elm.classList.toggle("active");
-	var content = elm.nextElementSibling;
-	if (content.style.display === "block") {
-		content.style.display = "none";
-	} else {
-		content.style.display = "block";
-	}
-}
-
 // Once thebelab is ready, auto-run all the cells in a "thebeAuto" div
 thebelab.on("status", function(evt, data) {
 		if (data.status == "ready") {

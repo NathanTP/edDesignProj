@@ -63,4 +63,4 @@ t_read_switch_memblade_measured,N/A,15377
 t_read_switch_memblade_theory,13083,13083
 
 # Time to read one page from RMEM (raw access time) from the real memory blade
-t_read_real,NULL,NULL
+# t_read_real,NULL,NULL

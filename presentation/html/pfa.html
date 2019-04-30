@@ -23,9 +23,9 @@
       },
     }
   </script>
-  <script type="text/javascript" src="https://unpkg.com/thebelab@^0.4.0" ></script>
+  <!-- <script type="text/javascript" src="https://unpkg.com/thebelab@^0.3.3" ></script> -->
+  <script type="text/javascript" src="thebelab/lib/index.js"></script>
   <script src="pfa.js"></script>
-  <!-- <script type="text/javascript" src="thebelab/lib/index.js"></script> -->
 </head>
 
 <body>
@@ -35,13 +35,6 @@
 	</span></div><br />
 
 	<div class="date" ></div>
-</div>
-
-<div class="thebeAuto">
-<pre data-executable="true" data-language="python">print("Hello")</pre>
-</div>
-<div class="thebeAuto">
-<pre data-executable="true" data-language="python">print("There!")</pre>
 </div>
 
 <!-- ABSTRACT -->
@@ -240,9 +233,6 @@ networks provide round-trip latencies of several microseconds (within a rack) an
 bandwidths of hundreds of gigabytes per second<span class="cite">[<span 
 class="cmbx-10">?</span>]</span>. These systems have historically
 been considered costly and were primarily deployed in supercomputing environments,
-                                                                  
-
-                                                                  
 but recent Ethernet-based implementations have made them increasingly
 accessible<span class="cite">[<span 
 class="cmbx-10">?</span>]</span>.
@@ -298,9 +288,6 @@ class="cmbx-10">?</span>]</span>.
 </p><!--l. 78--><p class="indent" >   Memory-semantic fabrics are newer and it is not clear how their interfaces should
 be exposed. By coupling tightly with CPUs, it is possible to address them directly
 using virtual memory. However, it may be desirable to allow applications to choose
-                                                                  
-
-                                                                  
 which memory they access, or have more abstracted interfaces (e.g., disk-like).
 Furthermore, these fabrics are designed to support highly heterogeneous memory
 technologies. This has lead to page-migration proposals that try to manage
@@ -376,33 +363,15 @@ overhead.
 </p>
 
 <!-- #Figure 2 -->
-<div class="tabbedFigure" id="fig2">
-  <div class="tab">
-    <button class="tablinks" onclick="openFig(event, 'fig2', 'fig2Def')" id="fig2defTab">Default</button>
-    <button class="tablinks" onclick="openFig(event, 'fig2', 'fig2User')">User</button>
-    <button class="tablinks" onclick="openFig(event, 'fig2', 'fig2Raw')">Raw</button>
-  </div>
-
-  <div id="fig2Def" class="tabcontent">
-    <hr class="figure" />
-      <div class="figure"  style="width: 75%; height: 75%;">
-        <a id="x1-90022"></a>
-        <!--l. 40-->
-        <p class="noindent" >
-          <img src="figs/paging_overhead.png" alt="PIC"/>
-          <br />
-        </p>
-        <!--tex4ht:label?: x1-90022 -->
-      </div>
-    <hr class="endfigure" />
-  </div>
-
-  <div id="fig2User" class="tabcontent">
-    <pre data-executable="true" data-language="python">print("Hello!")</pre>
-  </div>
-
-  <div id="fig2Raw" class="tabcontent">
-    <p>Nothing here yet</p>
+<hr class="figure" />
+  <div class="figure"  style="width: 75%; height: 75%;">
+    <a id="x1-90022"></a>
+    <!--l. 40-->
+    <p class="noindent" >
+      <img src="figs/paging_overhead.png" alt="PIC"/>
+      <br />
+    </p>
+    <!--tex4ht:label?: x1-90022 -->
   </div>
 
   <div class="caption">
@@ -411,9 +380,7 @@ overhead.
      oversubscription refers to the percent of peak memory that was stored remotely.</span>
   </div>
 
-  <script>document.getElementById("fig2defTab").click();</script>
-</div>
-
+<hr class="endfigure" />
 <!--l. 46--><p class="indent" >   To demonstrate this, we modified the Linux kernel to swap to pre-allocated
 DRAM buffers in local memory instead of an external device. This effectively
 eliminates backing store access times and directly measures the overhead of using
@@ -839,6 +806,12 @@ stack.
 <!--l. 1-->
 <p class="noindent" > </p>
 
+<h4 class="subsectionHead">
+  <span class="titlemark">5.1   </span> 
+  <a id="x1-250005.1"></a>
+  Experimental Design
+</h4>
+
 <div class="content" style="display: none;">
 	<div class="thebeAuto">
 		<pre id="pythonInit" data-executable="true" data-language="python">
@@ -848,6 +821,8 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as font_manager
 import math
+import ipywidgets as widgets
+from IPython.display import display
 
 #=====================
 # Matplotlib settings
@@ -862,9 +837,89 @@ matplotlib.rcParams.update({'font.size': 16})
 
 %matplotlib inline
 %config InlineBackend.figure_format = 'retina'
+    </pre>
+  </div>
+</div>
 
+<!--l. 2-->
+<p class="noindent" >Our evaluation is based on two benchmarks with significantly different access
+patterns. The first is quicksort (Qsort). This benchmark first allocates a large array
+of random numbers, and then sorts it using the well-known quicksort algorithm.
+Quicksort is a divide and conquer algorithm that automatically partitions the input
+array into small local blocks before performing a final sort. This leads to excellent
+cache behavior and predictable access patterns. Furthermore, by allocating the input
+array dynamically, quicksort performs no file I/O, so it is never blocked on I/O or
+other OS interactions.
+</p>
+
+<!--l. 12--><p class="indent" >The other benchmark is a de-novo genome assembly benchmark (Gen). Gen
+begins by loading a large text file that represents raw genome data. Raw genome
+data consists of short, overlapping, sequences of base-pairs called ”contigs”, the
+goal is to align these overlapping contigs into a single contiguous sequence
+representing a genome. This is done by loading contigs into a large hash table
+and probing into it repeatedly to find matching sequences. This leads to
+very little locality and unpredictable access patterns. Furthermore, Gen
+performs file I/O on the input, which allows for more complex OS interactions.
+<br class="newline" /></p>
+For each experiment, the kernel was intstrumented to collect a number of key
+metrics (see below). Additionally, the end-to-end runtime of the benchmark was recorded
+from userspace using a custom "time" command that measures cycles. All time
+measurements were performed using the RISC-V "rdcycle" instruction (which
+reports cycles) and later converted to seconds using a nominal 3.2GHz clock
+frequency.
+
+<hr class="figure" />
+<div class="figure">                        
+   <ul class="itemize1">
+     <li class="itemize">
+       RunTime: End-to-End runtime of the benchmark in seconds
+     </li>
+     <li class="itemize">
+      Slowdown: End-to-End runtime relative to the no-paging case.
+     </li>
+     <li class="itemize">
+       t_bookkeeping: Time spent in paging-related code in the kernel, does not include time spent waiting for I/O or performing generic tasks.
+     </li>
+     <li class="itemize">
+       t_rmem_write: Time spent writing to remote memory.
+     </li>
+     <li class="itemize">
+       t_rmem_read: Time spent reading from remote memory.
+     </li>
+     <li class="itemize">
+       n_fault: The total number of page-faults that occured during the run.
+     </li>
+     <li class="itemize">
+      t_fault: Total time spent in the page-fault handler.
+     </li>
+     <li class="itemize">
+       n_swapfault: Total number of page-faults due to paging (excludes things like protection faults or copy-on-write).
+     </li>
+     <li class="itemize">
+       n_pfa_fault: Total number of page-faults triggered by the PFA (due to full/empty queues).
+     </li>
+     <li class="itemize">
+       n_early_newq: Total number of times the newQ was drained pre-emptively (this occurs when a kernel algorithm touches a page before it has been processed).
+     </li>
+     <li class="itemize">
+       n_evicted: Total number of pages that were evicted (sent to remote memory).
+     </li>
+     <li class="itemize">
+      n_fetched: Total number of pages fetched (read from remote memory).
+     </li>
+   </ul>
+  <div class="caption">
+    <span class="id">Collected metrics for macro-benchmarks</span>
+  </div>
+
+</div>
+<hr class="endFigure" />
+
+<div class="content">
+	<div class="thebeAuto">
+		<pre id="pythonInit" data-executable="true" data-language="python">
 #============================================
-# Full Experiment Results Loading/Cleaning
+# Macro-Benchmark Experiment Results Loading/Cleaning
 #============================================
 res = pd.read_csv("raw/q64.csv", header=0, comment='#')
 
@@ -895,7 +950,44 @@ gen_pfa_res =      NormalizeRuntime(gen_pfa_res)
 gen_sw_res =   NormalizeRuntime(gen_sw_res)
 qsort_pfa_res =    NormalizeRuntime(qsort_pfa_res)
 qsort_sw_res = NormalizeRuntime(qsort_sw_res)
+print("Results Initialized")
+		</pre>
+	</div>
+</div>
 
+<p class="noindent">
+In addition to the end-to-end macrobenchmarks presented above, we also wrote a
+microbenchmark that triggers a single remote-memory page-fault and measures the
+resulting behavior. For "micro" dataset, a value of NaN indicates that the
+metric is not measurable or meaningful for that configuration.
+</p>
+<hr class="figure" />
+<div class="figure">                        
+   <ul class="itemize1">
+     <li class="itemize">
+       t_miss: Total time to fault and fetch a remote page once (from userspace)
+     </li>
+     <li class="itemize">
+       t_trap: Time between the fault and the first instruction of the kernel page-fault handler.
+     </li>
+     <li class="itemize">
+       t_fetch: Time for just the processing of the page (t_miss - t_trap)
+     </li>
+     <li class="itemize">
+       t_read_memblade_measured: Time to read a page from remote memory (experimentally measured).
+     </li>
+     <li class="itemize">
+       t_read_memblade_theory: Time spent off-chip reading a page from remote memory. This is smaller than t_read_memblade_measured due to NIC and software overheads.
+     </li>
+   </ul>
+  <div class="caption">
+    <span class="id">Collected metrics for micro-benchmarks</span>
+  </div>
+</div>
+
+<div class="content">
+	<div class="thebeAuto">
+		<pre id="pythonInit" data-executable="true" data-language="python">
 # Micro Benchmarks
 micro = pd.read_csv("raw/micro.csv", header=0, comment='#')
 # Convert cycles to seconds
@@ -908,31 +1000,14 @@ print("Results Initialized")
 	</div>
 </div>
 
-<h4 class="subsectionHead">
-  <span class="titlemark">5.1   </span> 
-  <a id="x1-250005.1"></a>
-  Experimental Design
-</h4>
+<p class="noindent">
+Each of the following figures provides three views to allow you to explore the
+data. In the default view, a curated figure is presented. In the "user" view,
+you may change a fixed set of parameters to explore the figure more clearly.
+The 'raw' view allows you to explore the raw data (all data are presented as
+pandas dataframes).
+</p>
 
-<!--l. 2-->
-<p class="noindent" >Our evaluation is based on two benchmarks with significantly different access
-patterns. The first is quicksort (Qsort). This benchmark first allocates a large array
-of random numbers, and then sorts it using the well-known quicksort algorithm.
-Quicksort is a divide and conquer algorithm that automatically partitions the input
-array into small local blocks before performing a final sort. This leads to excellent
-cache behavior and predictable access patterns. Furthermore, by allocating the input
-array dynamically, quicksort performs no file I/O, so it is never blocked on I/O or
-other OS interactions.
-</p><!--l. 12--><p class="indent" >   The other benchmark is a de-novo genome assembly benchmark (Gen). Gen
-begins by loading a large text file that represents raw genome data. Raw genome
-data consists of short, overlapping, sequences of base-pairs called ”contigs”, the
-goal is to align these overlapping contigs into a single contiguous sequence
-representing a genome. This is done by loading contigs into a large hash table
-and probing into it repeatedly to find matching sequences. This leads to
-very little locality and unpredictable access patterns. Furthermore, Gen
-performs file I/O on the input, which allows for more complex OS interactions.
-<br class="newline" /><br class="newline" /></p>
-<!--l. 23-->
 
 <!--l. 47-->
 <p class="noindent" >
@@ -946,62 +1021,9 @@ today to control application memory consumption (e.g., in containers). In this
 experiment, we disable kpfad in order to isolate the batching of new-page
 management from the scheduling flexibility offered by kswapd’s asynchrony. The PFA
 was configured to allow up to 64 outstanding page faults before bookkeeping was
-performed. <br 
-class="newline" /><br 
-class="newline" /></p><!--l. 58--><div class="lstinputlisting">
-<a 
- id="x1-26001"></a>
-   <span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-26002r1"></a></span><span 
-class="cmtt-10">CONFIG_PFA</span><span 
-class="cmtt-10">=</span><span 
-class="cmtt-10">y</span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-26003r2"></a></span><span 
-class="cmtt-10">CONFIG_PFA_EM</span><span 
-class="cmtt-10">=</span><span 
-class="cmtt-10">n</span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-26004r3"></a></span><span 
-class="cmtt-10">CONFIG_MEMBLADE_EM</span><span 
-class="cmtt-10">=</span><span 
-class="cmtt-10">n</span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-26005r4"></a></span><span 
-class="cmtt-10">CONFIG_PFA_VERBOSE</span><span 
-class="cmtt-10">=</span><span 
-class="cmtt-10">n</span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-26006r5"></a></span><span 
-class="cmtt-10">CONFIG_PFA_DEBUG</span><span 
-class="cmtt-10">=</span><span 
-class="cmtt-10">n</span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-26007r6"></a></span><span 
-class="cmtt-10">CONFIG_PFA_PFLAT</span><span 
-class="cmtt-10">=</span><span 
-class="cmtt-10">n</span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-26008r7"></a></span><span 
-class="cmtt-10">CONFIG_PFA_KPFAD</span><span 
-class="cmtt-10">=</span><span 
-class="cmtt-10">n</span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-26009r8"></a></span><span 
-class="cmtt-10">CONFIG_PFA_FREEQ_SIZE</span><span 
-class="cmtt-10">=64</span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-26010r9"></a></span><span 
-class="cmtt-10">CONFIG_PFA_NEWQ_SIZE</span><span 
-class="cmtt-10">=64</span><span 
-class="cmtt-10"> </span><br /><span class="label"><a 
- id="x1-26011r10"></a></span><span 
-class="cmtt-10">CONFIG_PFA_EVICTQ_SIZE</span><span 
-class="cmtt-10">=1</span>
-   
-   </div>
-<!--l. 60--><p class="indent" >   Both applications use 64MB of memory at their peak. We then varied the cgroup
+performed.
+
+<!--l. 60--><p class="indent" >Both applications use 64MB of memory at their peak. We then varied the cgroup
 memory limit from 100% (64MB) down to 25% (16MB), triggering increasing levels
 of paging. For both benchmarks, the PFA reduces end to end run time by up to
 1.4x.
@@ -1032,39 +1054,33 @@ of paging. For both benchmarks, the PFA reduces end to end run time by up to
 
 <div class="thebeAuto">
 	<pre data-executable="true" data-language="python">
-import ipywidgets as widgets
-from IPython.display import display
-genEnable = widgets.Checkbox(
-    value=False,
-    description='Genome',
-    disabled=False
-)
-display(genEnable)
-qsortEnable = widgets.Checkbox(
-    value=False,
-    description='QSort',
-    disabled=False
-)
-display(qsortEnable)
+# Dataset Selection
+genEnable = widgets.Checkbox(description='Genome', value=True)
+qsortEnable = widgets.Checkbox(description='QSort', value=True)
+#display(genEnable)
+#display(qsortEnable)
+
+# MemSize Selection
+largeMemEnable = widgets.Checkbox(description='75%', value=True)
+midMemEnable = widgets.Checkbox(description='50%', value=True)
+smallMemEnable = widgets.Checkbox(description='25%', value=True)
+
+leftBox = widgets.VBox([genEnable, qsortEnable])
+rightBox = widgets.VBox([largeMemEnable, midMemEnable, smallMemEnable])
+widgets.HBox([leftBox, rightBox])
 	</pre>
 </div>
 
 <pre data-executable="true" data-language="python">
+total_slowdown = pd.concat([gen_pfa_res['Slowdown'].rename("Genome PFA"),
+                            gen_sw_res['Slowdown'].rename("Genome SW"),
+														qsort_pfa_res['Slowdown'].rename("Qsort PFA"),
+														qsort_sw_res['Slowdown'].rename("Qsort SW")],
+                            axis=1)
 
-total_slowdown = pd.DataFrame()
-if genEnable.value:
-	total_slowdown = pd.concat([total_slowdown,
-														gen_pfa_res['Slowdown'].rename("Genome PFA"),
-                            gen_sw_res['Slowdown'].rename("Genome SW")],
-														axis=1)
-
-if qsortEnable.value:
-	total_slowdown = pd.concat([total_slowdown,
-															qsort_pfa_res['Slowdown'].rename("Qsort PFA"),
-															qsort_sw_res['Slowdown'].rename("Qsort SW")],
-														axis=1)
-
-ax = total_slowdown.plot(
+dataEnableMask = [genEnable.value, genEnable.value, qsortEnable.value, qsortEnable.value]
+memEnableMask = [largeMemEnable.value, midMemEnable.value, smallMemEnable.value]
+ax = total_slowdown.loc[memEnableMask, dataEnableMask].plot(
     kind='bar',
     legend=False,
     width=0.8)
@@ -1082,7 +1098,19 @@ plt.show()
   </div>
 
   <div id="fig9Raw" class="tabcontent">
-    <p>Nothing here yet</p>
+    <pre data-executable="true" data-language="python">
+total_slowdown = pd.concat([
+    gen_pfa_res['Slowdown'].rename("Genome PFA"),
+    gen_sw_res['Slowdown'].rename("Genome SW"),
+    qsort_pfa_res['Slowdown'].rename("Qsort PFA"),
+    qsort_sw_res['Slowdown'].rename("Qsort SW")],
+                            axis=1)
+
+# Use this space to explore the data
+# e.g.:
+print(total_slowdown["Genome PFA"] / total_slowdown["Qsort PFA"])
+    </pre>
+
   </div>
 
   <div class="caption">
