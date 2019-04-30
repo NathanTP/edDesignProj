@@ -1052,8 +1052,8 @@ of paging. For both benchmarks, the PFA reduces end to end run time by up to
 
   <div id="fig9User" class="tabcontent">
 
-<div class="thebeAuto">
-	<pre data-executable="true" data-language="python">
+    <div class="thebeAuto">
+      <pre data-executable="true" data-language="python">
 # Dataset Selection
 genEnable = widgets.Checkbox(description='Genome', value=True)
 qsortEnable = widgets.Checkbox(description='QSort', value=True)
@@ -1068,10 +1068,10 @@ smallMemEnable = widgets.Checkbox(description='25%', value=True)
 leftBox = widgets.VBox([genEnable, qsortEnable])
 rightBox = widgets.VBox([largeMemEnable, midMemEnable, smallMemEnable])
 widgets.HBox([leftBox, rightBox])
-	</pre>
-</div>
+      </pre>
+    </div>
 
-<pre data-executable="true" data-language="python">
+    <pre data-executable="true" data-language="python">
 total_slowdown = pd.concat([gen_pfa_res['Slowdown'].rename("Genome PFA"),
                             gen_sw_res['Slowdown'].rename("Genome SW"),
 														qsort_pfa_res['Slowdown'].rename("Qsort PFA"),
@@ -1094,7 +1094,7 @@ for i,bar in enumerate(ax.patches):
 ax.legend()    
 
 plt.show()
-</pre>
+    </pre>
   </div>
 
   <div id="fig9Raw" class="tabcontent">
@@ -1110,7 +1110,6 @@ total_slowdown = pd.concat([
 # e.g.:
 print(total_slowdown["Genome PFA"] / total_slowdown["Qsort PFA"])
     </pre>
-
   </div>
 
   <div class="caption">
@@ -1161,25 +1160,111 @@ this in a later section.
 </p>
 
 <!-- #Figure 10 -->
-<hr class="figure" />
-  <div class="figure">
-    <a id="x1-2800110"></a>
-    <!--l. 101-->
-    <p class="noindent" >
-      <img src="figs/fetch_breakdown.png" alt="PIC"/>
-      <br />
-    </p>
-    <div class="caption">
-      <span class="id">Figure 10: </span>
-      <span class="content">Breakdown of time in fetching a single remote page. All data are
-      the average of 10 runs. Error bars represent standard deviation (but are almost
-      too small to be seen). Note that local processing time (including the trap and
-      NIC interaction) only accounts for 8% of time with the PFA, but accounts for
-      over 50% of time for the baseline.</span>
-    </div>
-    <!--tex4ht:label?: x1-2800110 -->
+<div class="tabbedFigure" id="fig10">
+  <div class="tab">
+    <button class="tablinks tabdefault" onclick="openFig(event, 'fig10', 'fig10Def')" id="fig10defTab">Default</button>
+    <button class="tablinks" onclick="openFig(event, 'fig10', 'fig10User')">User</button>
+    <button class="tablinks" onclick="openFig(event, 'fig10', 'fig10Raw')">Raw</button>
   </div>
-<hr class="endfigure" />
+
+  <div id="fig10Def" class="tabcontent">
+    <hr class="figure" />
+      <div class="figure">
+        <a id="x1-2800110"></a>
+        <!--l. 101-->
+        <p class="noindent" >
+          <img src="figs/fetch_breakdown.png" alt="PIC"/>
+          <br />
+        </p>
+        <!--tex4ht:label?: x1-2800110 -->
+      </div>
+    <hr class="endfigure" />
+  </div>
+
+  <div id="fig10User" class="tabcontent">
+    <div class="thebeAuto">
+      <pre data-executable="true" data-language="python">
+mbLat = widgets.IntText(value=micro_mean['PFA']['t_read_switch_memblade_theory'],
+          description="Memory blade page-read latency (in ns)",
+          style={'description_width': 'initial'})
+display(mbLat)
+
+trapEnable = widgets.Checkbox(description='Trap', value=True)
+procEnable = widgets.Checkbox(description='Proc', value=True)
+NicEnable = widgets.Checkbox(description='NIC', value=True)
+mbEnable = widgets.Checkbox(description='MemBlade', value=True)
+widgets.VBox([trapEnable, procEnable, NicEnable, mbEnable])
+      </pre>
+    </div>
+
+    <pre data-executable="true" data-language="python">
+def breakdown_fault(df):
+    tmp = df.transpose().fillna(0)
+    ft = pd.DataFrame(index=tmp.index.copy())
+    ft['Trap'] = tmp['t_trap']
+    ft['Proc'] = tmp['t_fetch'] - tmp['t_read_switch_memblade_measured']
+    # The PFA takes 1 cycle of overhead before invoking the NIC 
+    ft['Proc']['PFA'] = 1 / 3.2
+    ft['NIC'] = tmp['t_read_switch_memblade_measured'] - tmp['t_read_switch_memblade_theory']
+    ft['NIC']['PFA'] = tmp['t_miss']['PFA'] - ft['Trap']['PFA'] - ft['Proc']['PFA'] - tmp['t_read_switch_memblade_theory']['PFA']
+    ft['MemBlade'] = [mbLat.value, mbLat.value]
+    return ft
+    
+fetchtime_mean = breakdown_fault(micro_mean)
+fetchtime_std  = breakdown_fault(micro_std)
+fetchtime_std['MemBlade'] = 0
+
+enableMask = [trapEnable.value, procEnable.value, NicEnable.value, mbEnable.value]
+fetchtime_mean = fetchtime_mean.loc[:,enableMask]
+ax = fetchtime_mean.plot(kind='bar', stacked=True, yerr=fetchtime_std, legend=False)
+hatches = ['o', 'o', 'x', 'x', '//', '//','|','|']
+for i,bar in enumerate(ax.patches):
+    bar.set_hatch(hatches[i])
+
+ax.legend()
+ax.set_ylabel('Time (ns)')
+plt.show()
+    </pre>
+  </div>
+
+  <div id="fig10Raw" class="tabcontent">
+    <pre data-executable="true" data-language="python">
+def breakdown_fault(df):
+    tmp = df.transpose().fillna(0)
+    ft = pd.DataFrame(index=tmp.index.copy())
+    ft['Trap'] = tmp['t_trap']
+    ft['Proc'] = tmp['t_fetch'] - tmp['t_read_switch_memblade_measured']
+    # This is measured directly in VCS
+    ft['Proc']['PFA'] = 1 / 3.2
+    ft['NIC'] = tmp['t_read_switch_memblade_measured'] - tmp['t_read_switch_memblade_theory']
+    ft['NIC']['PFA'] = tmp['t_miss']['PFA'] - ft['Trap']['PFA'] - ft['Proc']['PFA'] - tmp['t_read_switch_memblade_theory']['PFA']
+    ft['MemBlade'] = tmp['t_read_switch_memblade_theory']
+    #This is an optimistic memory blade (~1us)
+    #ft['MemBlade'] = 1129
+    return ft
+    
+fetchtime_mean = breakdown_fault(micro_mean)
+fetchtime_std  = breakdown_fault(micro_std)
+fetchtime_std['MemBlade'] = 0
+print(fetchtime_mean)
+
+# Use this area to interact with the raw data. For example, to show the speedup
+# of the PFA for total end-to-end paging latency:
+print(fetchtime_mean.sum(axis=1)['SW'] / fetchtime_mean.sum(axis=1)['PFA'])
+    </pre>
+  </div>
+
+  <div class="caption">
+    <span class="id">Figure 10: </span>
+    <span class="content">Breakdown of time in fetching a single remote page. All data are
+    the average of 10 runs. Error bars represent standard deviation (but are almost
+    too small to be seen). Note that local processing time (including the trap and
+    NIC interaction) only accounts for 8% of time with the PFA, but accounts for
+    over 50% of time for the baseline.</span>
+  </div>
+
+  <script>document.getElementById("fig10defTab").click();</script>
+</div>
 
 <!--l. 110--><p class="indent" >   Note that the trap overhead is a very small fraction of total time (just 113 ns).
 This is a result of using a simple in-order RISC core like Rocket. It is likely that this
