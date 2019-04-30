@@ -33,7 +33,95 @@ a:hover {
 
 img { object-fit: contain; height: 100%; width: 100%;}
 
+td {text-align: left}
+
+/* I'm pretty sure this is the wrong way to do this...
+ * I'm just matching what 4ht did for #TBL-2 below */
+#metricsTbl colgroup{border-left: 1px solid black;border-right:1px solid black;}
+#metricsTbl{border-collapse:collapse;}
+#metricsTbl colgroup{border-left: 1px solid black;border-right:1px solid black;}
+#metricsTbl{border-collapse:collapse;}
+#metricsTbl colgroup{border-left: 1px solid black;border-right:1px solid black;}
+#metricsTbl{border-collapse:collapse;}
+
+/* Collapsible */
+/*=========================================*/
+.wrap-collabsible {
+  margin-bottom: 1.2rem 0;
+}
+
+input[class='toggleCol'] {
+  display: none;
+}
+
+.lbl-toggle {
+  display: block;
+
+  font-weight: bold;
+	font-family: "Latin Modern Roman", "Lucida Console", Monaco, monospace;
+  font-size: 14px;
+  text-transform: uppercase;
+  text-align: left;
+
+  padding: 0.5rem;
+
+  color: #696969;
+  background: #CCCCCC;
+
+  cursor: pointer;
+
+  border-radius: 7px;
+  transition: all 0.25s ease-out;
+}
+
+.lbl-toggle:hover {
+  color: #454545;
+}
+
+.lbl-toggle::before {
+  content: ' ';
+  display: inline-block;
+
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 5px solid currentColor;
+  vertical-align: middle;
+  margin-right: .7rem;
+  transform: translateY(-2px);
+
+  transition: transform .2s ease-out;
+}
+
+.toggleCol:checked + .lbl-toggle::before {
+  transform: rotate(90deg) translateX(-3px);
+}
+
+.collapsible-content {
+  max-height: 0px;
+  overflow: hidden;
+  transition: max-height .25s ease-in-out;
+}
+
+.toggleCol:checked + .lbl-toggle + .collapsible-content {
+  max-height: 1000px;
+}
+
+.toggleCol:checked + .lbl-toggle {
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.collapsible-content .content-inner {
+  background: #F5F5F5;
+  border-bottom: 1px solid rgba(250, 224, 66, .45);
+  border-bottom-left-radius: 7px;
+  border-bottom-right-radius: 7px;
+  padding: .5rem 1rem;
+}
+
+
 /* Tabbed figures */
+/*============================================*/
 .tab {
   overflow: hidden;
   border: 1px solid #ccc;
@@ -267,6 +355,7 @@ span#textcolor32{color:#000000}
 span#textcolor33{color:#000000}
 span#textcolor34{color:#000000}
 span#textcolor35{color:#000000}
+
 #TBL-2 colgroup{border-left: 1px solid black;border-right:1px solid black;}
 #TBL-2{border-collapse:collapse;}
 #TBL-2 colgroup{border-left: 1px solid black;border-right:1px solid black;}
